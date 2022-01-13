@@ -1,0 +1,4 @@
+/target
+*.code-workspace
+__pycache__
+*.egg-info
