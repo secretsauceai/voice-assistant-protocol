@@ -12,6 +12,8 @@
 * TCP or UDP?
 * Given that any path does not implement two methods, how about they are ignored?
 * Should we join server queries and notifications using GET/POST into just one path? Queries would use GET and notifications POST.
+* Instead of confirmable, can we just wait for the answer?
+
 
 
 ## To resolve by myself
@@ -39,17 +41,17 @@ Name of the Zeroconf service for the Skill Registry "vap-skill-registry.udp"
 
 ## Init:
 
-*POST* **Server/vap/skill_registry/connect** (Confirmable: Mandatory)
+*POST* **Server/vap/skill_registry/connect** (Confirmable: Mandatory, Skill -> Registry)
 * Name: Human readable name of the skill
 * Id: Unique ascii based name of the skill in the form of org.company.product
-* Version
+* VAP Version
 * UniqueAuthenticationToken (Optional)
 
 Skill connects with skill register.
 
 **Answer**
 * One of:
-    * OK!
+    * OK! (Code: 201 Created)
         * Which languages are present in the system
         * ConnectionAuthenticationToken
         * UniqueAuthorizationToken (If not provided before)
@@ -85,7 +87,7 @@ can now reliable if a request comes from the server or not, without having to
 depend on addresses.
 
 After that send:
-*POST* **Server/vap/skill_registry/register_utts** (Confirmable: Mandatory)
+*POST* **Server/vap/skill_registry/register_utts** (Confirmable: Mandatory, Skill -> Registry)
 * One set per language:
     * Utterances
         * Text
@@ -94,12 +96,12 @@ After that send:
 
 **Answer**
 * Either:
-    * Ok
+    * Ok (Code: 201 Created)
     * Error
-        * Why? (*Note:* Do we need to do error codes?)
+        * Why? 
 
 ## Skill interactions:
-*GET* **Skill/vap/can_you_answer**
+*GET* **Skill/vap/can_you_answer**  (Confirmable: Optional, Registry -> Skill)
 * ConnectionAuthorizationToken
 * One of:
     * Event
@@ -110,7 +112,7 @@ After that send:
 
 The server is asking "Can you answer this request?"
 
-**Answer:**
+**Answer:** (Code: 205 Content)
 * ConnectionAuthorizationToken
 * Confidence: float
 
@@ -118,7 +120,7 @@ The server is asking "Can you answer this request?"
  generic request like "turn off the kitchen lights") we send them the intent and the slots (like "turn_off" "kitchen lights") and each skill returns an 
  estimation of how well they can answer this request.
 
-*POST* **Skill/vap/request** 
+*POST* **Skill/vap/request** (Confirmable: Optional, Registry->Skill)
 * ConnectionAuthorizationToken
 * Device:
     * Capabilities
@@ -133,7 +135,7 @@ The server is asking "Can you answer this request?"
         * Slots
         * Language: Language in which the interaction happened
 
- * Answer:
+**Answer:** (Code: **TODO**)
     * ConnectionAuthorizationToken
     * Data:
         * One per capability:
@@ -141,7 +143,7 @@ The server is asking "Can you answer this request?"
                 * Capability data: Any
 
 ## At any time:
-*POST* **Server/vap/skill_registry/notification**
+*POST* **Server/vap/skill_registry/notification** (Confirmable: Optional, Skill -> Registry)
 * ConnectionAuthorizationToken
 * Data: (Can send to multiple at the same time, one per client to send)
     * Client name to send this to
@@ -153,22 +155,27 @@ The server is asking "Can you answer this request?"
  A notification is a message started by a skill. Sometimes a skill needs to send
  information on it's own, not as an answer to something the user asked, whether
  it's a stream of sound or whether is just an alarm. Note that the server can
- also receive notifications 
+ also receive notifications.
+
+**TODO:**  Does this needs an answer?
 
 
-*GET* **Server/vap/skill_registry/query**
+*GET* **Server/vap/skill_registry/query** (Confirmable: Optional, Skill -> Registry)
  * Query:
     * ConnectionAuthorizationToken
     * Data:
         * 
  
- * Answer:
+**Answer:**
+ * Ok! (Code: 205 Content)
     * ConnectionAuthorizationToken
+ * Error
+    * **TODO:** Which errors?
 
 Retrieve data from the server. *NOTE* Which data?
 
 ## Shutdown
-*POST* **Server/vap/skill_registry/skill_close**
+*POST* **Server/vap/skill_registry/skill_close** (Confirmable: Mandatory, Skill -> Registry)
  * Skill id: (The one like org.company.product)
  * ConnectionAuthoriztionToken
 
