@@ -13,8 +13,9 @@
 * Given that any path does not implement two methods, how about they are ignored?
 * Should we join server queries and notifications using GET/POST into just one path? Queries would use GET and notifications POST.
 * Instead of confirmable, can we just wait for the answer?
-
-
+* How to treat versions? As Strings, as some combination of numbers...
+* What is the type of the UniqueAuthentcationToken
+* snake_case or CamelCase?
 
 ## To resolve by myself
 
@@ -43,7 +44,7 @@ Name of the Zeroconf service for the Skill Registry "vap-skill-registry.udp"
 
 *POST* **Server/vap/skill_registry/connect** (Confirmable: Mandatory, Skill -> Registry)
 * Name: Human readable name of the skill
-* Id: Unique ascii based name of the skill in the form of org.company.product
+* skill_uuid: Unique ascii based name of the skill in the form of org.company.product
 * VAP Version
 * UniqueAuthenticationToken (Optional)
 
@@ -176,7 +177,7 @@ Retrieve data from the server. *NOTE* Which data?
 
 ## Shutdown
 *POST* **Server/vap/skill_registry/skill_close** (Confirmable: Mandatory, Skill -> Registry)
- * Skill id: (The one like org.company.product)
+ * skill_id: (The one like org.company.product)
  * ConnectionAuthoriztionToken
 
 * Answer?

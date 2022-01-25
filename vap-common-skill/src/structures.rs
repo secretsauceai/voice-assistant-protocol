@@ -1,28 +1,32 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct RegisterSkill {
+pub struct MsgConnect {
     /// A skill id in the form of org.organization.skill
     pub id: String, 
 
     /// A human readable name for the skill
-    pub name: String 
+    pub name: String ,
+
+    
+    pub vap_version: String,
+
+    pub unique_authentication_token: Option<String>
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct InitialSkillConfig { // TODO: Add the possibility of some error
+pub struct MsgConnectResponse {
     /// A list of languages currently in use by the voice assistant
     pub langs: Vec<Language>, 
 
-    /** A unique ID for the skill issued by the skill register
-     *  this is made so that skill can ignore fraudulent
-     * messages
-     */
-    pub skill_uuid: String,
+    pub unique_authentcation_token: Option<String>,
+
+    pub connection_authentication_token: Option<String>
 }
 
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct InitialUtterances {
+pub struct MsgRegisterUtts {
     // pub utterances: One set per language
 }
 
@@ -56,6 +60,17 @@ pub struct SkillAnswer {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SkillNotify {
+pub struct MsgNotification {
     //
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct MsgQuery {
+    //
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct MsgSkillClose {
+    pub skill_id: String,
+    pub connection_authorization_token: String
 }
