@@ -171,22 +171,39 @@ impl SkillRegister {
         Ok(())   
     }
 
-    pub fn skills_answerable(&mut self) -> Vec<SkillCanAnswer> {
+    pub fn skills_answerable(&mut self, ips: &[String]) -> Vec<MsgSkillCanAnswerResponse> {
+        fn send_msg(ip: &str) -> Result<MsgSkillCanAnswerResponse, Error> {
+            let c = CoAPClient::new(ip).unwrap();
+            let msg = MsgSkillCanAnswer{};
+            let data = rmp_serde::to_vec(&msg).unwrap();
+            let resp = c.request_path("vap/can_you_answer", Method::Get, Some(data), None).unwrap();
+            let resp_data = rmp_serde::from_read(Cursor::new(resp.message.payload)).unwrap();
+            Ok(resp_data)
+        }
 
-        let url = "coap://127.0.0.1:5683/Rust";
-        println!("Client request: {}", url);
-
-        //let c = CoAPClient::new(addr).unwrap();
-        //let response = CoAPClient::get(url).unwrap();
-        //println!("Server reply: {}", String::from_utf8(response.message.payload).unwrap());
-        std::unimplemented!("");
-        //
-        vec![]
+        let mut answers = Vec::new();
+        for ip in ips {
+            match send_msg(ip) {
+                Ok(resp) => {
+                    println!("{:?}", resp);
+                    answers.push(resp);
+                }
+                Err(e) => {
+                    // TODO: What to do with the errors?
+                    println!("{:?}", e);
+                }
+            }
+        }
+        
+        answers
     }
 
-    pub async fn activate_skill(&mut self, skill_id: String) {
-        // skill_id -> ip & port
-        std::unimplemented!("");
+    pub async fn activate_skill(&mut self, ip: String, msg: MsgSkillAnswer) -> Result<MsgSkillAnswerResponse, Error> {
+        let c = CoAPClient::new(ip).unwrap();
+        let data = rmp_serde::to_vec(&msg).unwrap();
+        let resp = c.request_path("vap/can_you_answer", Method::Get, Some(data), None).unwrap();
+        let resp_data = rmp_serde::from_read(Cursor::new(resp.message.payload)).unwrap();
+        Ok(resp_data)
     }
 }
 
