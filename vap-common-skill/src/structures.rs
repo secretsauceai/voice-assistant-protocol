@@ -48,13 +48,25 @@ pub struct ProcessingResult {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SkillCanAnswer {
+pub struct MsgSkillCanAnswer {
     // - pub request
     // - pub slot
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SkillAnswer {
+pub struct MsgSkillCanAnswerResponse {
+    // - pub request
+    // - pub slot
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct MsgSkillAnswer {
+    // pub isfinal
+    // pub capabilities
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct MsgSkillAnswerResponse {
     // pub isfinal
     // pub capabilities
 }
