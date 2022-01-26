@@ -2,9 +2,9 @@ use std::future::Future;
 use std::io::Cursor;
 use std::net::SocketAddr;
 
-
-use coap_lite::{RequestType as Method, CoapRequest, CoapResponse};
-use coap::Server;
+use coap_lite::{RequestType as Method, CoapRequest, CoapResponse, ResponseType};
+use coap::{CoAPClient, Server};
+use futures::{channel::{mpsc, oneshot}, StreamExt, SinkExt};
 use libmdns::{Responder, Service};
 use rmp_serde::from_read;
 use serde::de::DeserializeOwned;
@@ -21,11 +21,20 @@ pub enum Error {
 
     #[error("{0}")]
     ZeroconfPolling(std::io::Error),
+
+    #[error("A Oneshot channel was closed")]
+    ClosedChannel
+}
+
+pub struct Response {
+    pub status: ResponseType,
+    pub payload: Vec<u8>,
 }
 
 pub struct SkillRegister {
     name: String,
-    port: u16
+    port: u16,
+    in_send: mpsc::Sender<(SkillRegisterMessage, oneshot::Sender<Response>)>,
 }
 
 pub enum SkillRegisterMessage {
@@ -37,21 +46,29 @@ pub enum SkillRegisterMessage {
 }
 
 impl SkillRegister {
-    pub fn new(name: &str, port: u16) -> Result<Self, Error> {        
-        Ok(SkillRegister {
-            name: name.to_string(),
-            port
-        })
+    pub fn new(name: &str, port: u16) -> Result<(Self, SkillRegisterStream), Error> {   
+        let (in_send, in_recv) = mpsc::channel(20);
+        Ok((
+            SkillRegister {
+                name: name.to_string(),
+                port,
+                in_send,
+            },
+
+            SkillRegisterStream {
+                stream_in: in_recv,
+            }
+        ))
     }
 
-    pub async fn recv(&self) -> Result<(SkillRegisterMessage, Option<CoapResponse>), Error>  {
+    pub async fn run(&self) -> Result<(), Error>  {
         let _zeroconf = ZeroconfService::new(&self.name, self.port)?;
 
-        async fn perform(request: CoapRequest<SocketAddr>) -> Option<CoapResponse> {
-            fn read_payload<T: DeserializeOwned>(payload: &[u8], r: &Option<CoapResponse>) -> Result<T, Option<CoapResponse>> {
+        async fn perform(request: CoapRequest<SocketAddr>, mut in_send: mpsc::Sender<(SkillRegisterMessage, oneshot::Sender<Response>)>) -> Option<CoapResponse> {
+            fn read_payload<T: DeserializeOwned>(payload: &[u8], r: Option<CoapResponse>) -> Result<(T, Option<CoapResponse>), Option<CoapResponse>> {
                 match from_read(Cursor::new(payload)) {
                     Ok::<T,_>(a) => {
-                        Ok(a)
+                        Ok((a,r))
                     }
                     Err(e) => {
                         Err(r.map(|mut r|{
@@ -79,11 +96,28 @@ impl SkillRegister {
                 })
             }
 
-            fn response_not_implemented(r:Option<CoapResponse>) -> Option<CoapResponse> {
-                r.map(|mut r| {
-                    r.set_status(coap_lite::ResponseType::NotImplemented);
-                    r
-                })
+            async fn handle_msg<T: DeserializeOwned, F: FnOnce(T) -> SkillRegisterMessage>(request: CoapRequest<SocketAddr>, in_send: &mut mpsc::Sender<(SkillRegisterMessage, oneshot::Sender<Response>)>, cb: F) -> Option<CoapResponse> {
+                match read_payload(&request.message.payload, request.response) {
+                    Ok::<(T,_),_>((p, resp)) => {
+                        let (sender, receiver) = oneshot::channel();
+                        in_send.send((cb(p), sender)).await.unwrap();
+                        match receiver.await {
+                            Ok(resp_data) => {
+                                resp.map(|mut r|{
+                                    r.set_status(resp_data.status);
+                                    r.message = coap_lite::Packet::from_bytes(&resp_data.payload).unwrap();
+                                    r
+                                })
+                            }
+                            Err(_) => {
+                                None
+                            }
+                        }
+                    }
+                    Err(r) => {
+                        r
+                    }
+                }
             }
 
             
@@ -91,33 +125,29 @@ impl SkillRegister {
                 Method::Get => {
                     match request.get_path().as_str() {
                         "vap/skill_registry/query" => {
-                            response_not_implemented(request.response)
+                            handle_msg(request, &mut in_send, |p|{SkillRegisterMessage::Query(p)}).await
                         }
 
                         _ => response_not_found(request.response)
                     }
-                    /*if let Some::<RegisterSkill>(p) = read_payload(&request.message.payload) {
-                
-                    };*/        
                 }
 
                 Method::Post => {                 
                     match request.get_path().as_str() {
                         "vap/skill_registry/connect" => {
-                            let p: MsgConnect = read_payload(&request.message.payload, &request.response)?;
-                            
+                            handle_msg(request, &mut in_send, |p|{SkillRegisterMessage::Connect(p)}).await
                         }
 
                         "vap/skill_registry/register_utts" => {
-                            response_not_implemented(request.response)
+                            handle_msg(request, &mut in_send, |p|{SkillRegisterMessage::RegisterUtts(p)}).await
                         }
 
                         "vap/skill_registry/notification" => {
-                            response_not_implemented(request.response)
+                            handle_msg(request, &mut in_send, |p|{SkillRegisterMessage::Notification(p)}).await
                         }
 
                         "vap/skill_registry/skill_close" => {
-                            response_not_implemented(request.response)
+                            handle_msg(request, &mut in_send, |p|{SkillRegisterMessage::Close(p)}).await
                         }
 
                         _ => response_not_found(request.response)
@@ -135,17 +165,48 @@ impl SkillRegister {
         }
 
         let mut server = Server::new(format!("127.0.0.1:{}", self.port)).unwrap();
-        server.run(perform).await.unwrap();
+        server.run( |request| {
+            perform(request, self.in_send.clone())
+        }).await.unwrap();
         Ok(())   
     }
 
-    pub async fn skills_answerable(&mut self) -> Vec<SkillCanAnswer> {
-        // 
+    pub fn skills_answerable(&mut self) -> Vec<SkillCanAnswer> {
+
+        let url = "coap://127.0.0.1:5683/Rust";
+        println!("Client request: {}", url);
+
+        //let c = CoAPClient::new(addr).unwrap();
+        //let response = CoAPClient::get(url).unwrap();
+        //println!("Server reply: {}", String::from_utf8(response.message.payload).unwrap());
+        std::unimplemented!("");
+        //
         vec![]
     }
 
     pub async fn activate_skill(&mut self, skill_id: String) {
+        // skill_id -> ip & port
+        std::unimplemented!("");
+    }
+}
 
+pub struct SkillRegisterStream {
+    stream_in: mpsc::Receiver<(SkillRegisterMessage, oneshot::Sender<Response>)>,
+}
+
+impl SkillRegisterStream {
+    pub async fn recv(&mut self) -> Result<(SkillRegisterMessage, oneshot::Sender<Response>), Error> {
+        Ok(self.stream_in.next().await.unwrap())
+    }
+
+    pub async fn read_incoming<F, Fut>(mut self, cb: F) -> Result<(), Error>
+    where
+    F: Fn(SkillRegisterMessage) -> Fut,
+    Fut: Future<Output = Response> {
+        loop {
+            let (msg, sender) = self.recv().await.unwrap();
+            sender.send(cb(msg).await).map_err(|_|Error::ClosedChannel)?;
+        }
     }
 }
 
@@ -172,15 +233,18 @@ mod conf {
     pub const PORT: u16 = 5683;
 }
 
+async fn on_msg(_msg: SkillRegisterMessage) -> Response {
+    Response {
+        status: coap_lite::ResponseType::NotImplemented,
+        payload: vec![]
+    }
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    let reg = SkillRegister::new("test-skill-register", conf::PORT).unwrap();
-    reg.on_new_skill(|skill| async move {
-        println!("{:?}", skill);
-    }).await;
-
-    reg.on_skill_disconnect(|skill| async move {
-        println!("{:?}", skill);
-    }).await;
-
+    let (reg, stream) = SkillRegister::new("test-skill-register", conf::PORT).unwrap();
+    tokio::select!(
+        _= reg.run() => {},
+        _= stream.read_incoming(on_msg) => {}
+    );
 }
