@@ -18,6 +18,10 @@
 * snake_case or CamelCase? (snake_case is the default for HTTP, Hermes and Alexa use pascalCase)
 * pascalCase for URIs?
 * Maybe the UniqueAuthenticationToken can be adapted/related to keys in OSCORE/DTLS?
+* Can we deal with differences in how a required slot is asked?
+* Is every NLU capable of being strict (like in register utterances)?
+* Modeled mostly after Alexa and Hermes, maybe remodel it like Google's scenes, more advanced?
+* We need a "system_id" for the "core/server/voice assistant" to be referenced.
 
 ## To resolve by myself
 
@@ -80,10 +84,21 @@ token has to be resent each time the skill wants to connect to a system.
 After that send:
 *POST* **Server/vap/skill_registry/register_utts** (Confirmable: Mandatory, Skill -> Registry)
 * nluData: One set per language
-    * utterances:
-        * text: String
-        * slots:
+    * language: Language
+    * intents:
+        * name: String
+        * utterances:
+            * text: String
+        * slots: 
+            * entity: String -> Name of entity.
+            * required: bool -> If true the assistant must ask for it beforehand.
+            * prompt: Optional<String> -> If required and not present the slot will be asked .with this.
+            * reprompt: Optional<String> -> If prompt failed try with this one.
     * entities:
+        * strict: bool (default: false) -> If true only the words in the list will be accepted
+        * data:
+            * value: String
+            * synonyms: array[String]
 
 **Answer**
 * Either:
@@ -93,49 +108,68 @@ After that send:
 
 ## Skill interactions:
 *GET* **Skill/vap/can_you_answer**  (Confirmable: Optional, Registry -> Skill)
-* One of:
-    * Event
-        * Name
-    * Request
-        * Utterance
-        * Slots
+* request:
+    * type: "event"|"intent" -> Internally tagged request data.
+    * capabilities:
+        * name: String
+        * <capability data>
+
+    * type: "event"
+    * Name
+
+    * type: "intent"
+    * name: String
+    * locale: Language
+    * input: String
+    * slots:
+        * name: String
+        * value: Optional<String>
 
 The server is asking "Can you answer this request?"
 
 **Answer:** (Code: 205 Content)
-* Confidence: float
+* confidence: float
 
  When multiple skills are capable of answering the same request (it could be a
  generic request like "turn off the kitchen lights") we send them the intent and the slots (like "turn_off" "kitchen lights") and each skill returns an 
  estimation of how well they can answer this request.
 
 *POST* **Skill/vap/request** (Confirmable: Optional, Registry->Skill)
-* Device:
-    * Capabilities
-        * Name (*TODO:* Internally or externally tagged?)
-        * Version
-    * Client name? (*NOTE:* So that the skill can record it if needed to send notifications later? )
-* One of:
-    * Event:
-        * Name
-    * Request:
-        * Utterance
-        * Slots
-        * Language: Language in which the interaction happened
+* client:
+    * system_id: String -> An unique ID for the client to be recognized, it doesn't have to be the same one that client provides, can be randomly generated.
+    * capabilities:
+        * name: String
+        * version: int
 
-**Answer:** (Code: **TODO**)
-    * Data:
-        * One per capability:
-            * Name: (*NOTE:* Here having the capability name on the outside looks easier for the server to filter even unknown capabilities, still to be confirmed)
-                * Capability data: Any
+* request:
+    * type: "event"|"intent" -> Internally tagged request data.
+    * capabilities: Extra data sent by the client
+        * name: String
+        * <capability data>
+
+    * type: "event"
+    * Name
+
+    * type: "intent"
+    * name: String
+    * locale: Language
+    * input: String
+    * slots:
+        * name: String
+        * value: Optional<String>
+
+**Answer:** (Code: 204 Changed, a skill can return "205 Content" if no internal state changed and the same request will always return the same answer)
+* capabilities:
+    * name: String
+    * <capability data>
 
 ## At any time:
 *POST* **Server/vap/skill_registry/notification** (Confirmable: Optional, Skill -> Registry)
-* Data: (Can send to multiple at the same time, one per client to send)
-    * Client name to send this to
-    * One per capability:
-        * Name: (*Note:* same as above)
-            * Capability data: Any
+* data: (Can send to multiple at the same time, one per client to send)
+    * client_id: String -> System_id of client 
+    * capabilities:
+        * name: String
+        * <capability data>
     
 
  A notification is a message started by a skill. Sometimes a skill needs to send
