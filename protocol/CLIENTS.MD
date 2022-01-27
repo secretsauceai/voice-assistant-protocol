@@ -12,6 +12,7 @@
 * Should session data be preferably non-confirmable?
 * Is UniqueAuthenticationTokenRequired on the clients?
 * Context data should be handled here?
+* Think of ways the system can ask for the client to be accepted into the network (it could be rejected)
 
 ## To resolve by myself
 
@@ -33,51 +34,48 @@ Name of the Zeroconf service for the Client Registry "vap-client-registry.udp"
 ## Init:
 
 *POST* **Server/vap/client_registry/connect** (Confirmable: Mandatory, Client -> Registry)
-* Name:
-* Id: (like org.company.product)
-* VAP Version:
-* UniqueAuthorizationToken:
+* name:
+* id: String -> (like org.company.product)
+* vap_version:
+* uniqueAuthorizationToken: 
 
 Client connects with client register. We have a uniqueAuthorizationToken, this let us know and understand that the client has been allowed in the system, and that it is who's saying to be. This is required mostly because of the possibility of user authenticaion, if any client was allowed to access the server, aunthencation would be useless, someone not allowed in the assistant could just attack the system with a hacked client.
 
 The UniqueAuthorizationToken works just like the client one, the first time a client connects, that field is empty here and the server will asign one, which the client needs to send the next time they connect to the system. Failing this means that the client won't be allowed into the system.
 
 **Answer**
-* One of:
-    * OK! (Code: 201 Created)
-        * UniqueAuthorizationToken: (Optional)
-        * ConnectionAuthorizationToken
-    * Errors:
-        * Which?
+* OK! (Code: 201 Created)
+    * UniqueAuthorizationToken: (Optional)
+    * locales: Locale
+* Errors:
+    * Which?
 
 The server will answer a UniqueAuthorizationToken only if this is the first time the client is connecting and we don't have any record of it.
-
-It will also issue a ConnectionAuthorizationToken which has to be presented on each request, the server will present it too.
 
 ## Session start
 
 *POST* **Server/vap/client_registry/session_start** (Confirmable: Optional, Client -> Registry)
-* Optional capabilities:
-    * Wakeword authentication (wake word is sent for double checking with a bigger model or to check that the user has permission for it to be in the system).
+* capabilities: Optional<[]> ->
+    * name: String
+    * <capability data>
 * ConnectionAuthorizationToken
 * ExactTimeStamp:  #!TODO#! Is this really needed?
 
-This signals that a
+This signals that a client wants to start a session. At this point we can send capabilities too, they are meant for user authorization and wake word double checking (with a bigger, slower, more accurate model in the server). Of course, the server is free to either accept it or reject if because of any reason.
 
 **Answer**
-* One of:
-    * OK (Code: 201 Created)!
-        * ConnectionAuthorizationToken
-    * Error:
-        * User authentication (voice, face, wathever) wasn't successful
-        * Wakeword double check wasn't succesful
-        * Two or more clients were activated by the same user at the same time and another got the focus. (#!TODO#!Is this technically an error?)
+* OK (Code: 201 Created)!
+* Error:
+    * User authentication (voice, face, wathever) wasn't successful
+    * Wakeword double check wasn't succesful
+    * Two or more clients were activated by the same user at the same time and another got the focus. (#!TODO#!Is this technically an error?)
+    * Too many clients? (#!TODO#!Is this technically an error?)
 
 *POST* **Server/vap/client_registry/session_data** (Confirmable: Optional, Client -> Registry)
-* Capabilities data:
-    * Capability:
-    * Other fields
-* Last fragment: bool
+* capabilities: [] ->
+    * name: String
+    * <capability data>
+* last_fragment: bool
 
 **Answer**
 * Ok (Code: 231 Continue)
@@ -88,28 +86,28 @@ This signals that a
     * #!TODO#! Should we wait for the answer from the whole pipeline? Or rather send a "everything alright we are processing"? Note: An everything alright we are processing seems interesting from the viewpoint of a device that wants to show the user that there's processing being done.
 
 Final answer:
-* Capabilites data:
-    * Capability:
-    * Other fields
-* Session end: bool
+* capabilities: [] ->
+    * name: String
+    * <capability data>
+* end_session: bool
 
 ## On Anytime
 
 *POST* **Client/vap/notification** (Confirmable: Optional, Registry -> Client)
-* Capabilities data:
-    * Capability:
-    * Other fields
+* capabilities: [] ->
+    * name: String
+    * <capability data>
 
 #!TODO#! Does this need an answer? An alternative could be to propose having it as confirmable.
 
 ## When closing
 
 *POST* **Server/vap/client_registry/client_close** (Confirmable: Mandatory, Client -> Registry)
-* ID: (The one like org.company.product)  
-* ConnectionAuthorzationToken:
+* client_id: (The one like org.company.product)  
 
 **Answer**:
 * Either:
-    * OK! (Code: #!TODO#!)
-        * ConnectionAuthorzationToken:
+    * OK! (Code: 202 Deleted)
     * Error:
+        * 400 Bad request: skill_id does not exist
+        * 401 Unauthorized: This skill_id is not related to this address

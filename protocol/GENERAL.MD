@@ -23,7 +23,7 @@ If the received data is not valid MsgPack/CBOR a 400 "Bad Request" error is retu
 
 If the message lacks a mandatory field a 408 "Request Entity Incomplete" error is returned.
 
-If a request has an invalid (Connection or Unique) AuthenticationToken then a 401 "Unauthorized error" is returned.
+If a connection request has an invalid UniqueAuthenticationToken then a 401 "Unauthorized error" is returned.
 
 If the message uses a method not registered by the specification (using a put instead of a POST) an implementation CAN return a 405 "Method not allowed". #!TODO: This is related to the TODO of not making use of methods#!
 

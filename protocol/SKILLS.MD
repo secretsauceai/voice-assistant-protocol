@@ -1,6 +1,6 @@
 # TODOS
 
-* Internally tagged vs externally tagged? (both Alexa and Hermes use internally tagged, what about for languages?)
+* Internally tagged vs externally tagged? (both Alexa and Hermes use internally tagged)
 * Better name than VAP?
 * Signals and skill queries on VAP?
     * Task polling to detect changes? (Maybe this can be done as a separate skill)
@@ -15,19 +15,19 @@
 * Instead of confirmable, can we just wait for the answer?
 * How to treat versions? As Strings, as some combination of numbers...
 * What is the type of the UniqueAuthentcationToken
-* snake_case or CamelCase? (snake_case is the default for HTTP, Hermes and Alexa use pascalCase)
 * pascalCase for URIs?
 * Maybe the UniqueAuthenticationToken can be adapted/related to keys in OSCORE/DTLS?
 * Can we deal with differences in how a required slot is asked?
 * Is every NLU capable of being strict (like in register utterances)?
 * Modeled mostly after Alexa and Hermes, maybe remodel it like Google's scenes, more advanced?
 * We need a "system_id" for the "core/server/voice assistant" to be referenced.
+* Think of ways the system can ask for the skill to be accepted (it could be rejected)
 
 ## To resolve by myself
 
 * Specify language negotiation strategy (first analyze them and then show possible answers). Available in fluent-langneg (https://docs.rs/fluent-langneg/latest/fluent_langneg/negotiate/index.html):
     * Exact match
-    * Local e range
+    * Locale range
     * Use ICU LikelySubtags
     * Different variant of the same locale
     * Only consider language stripped and then maximize it
@@ -62,7 +62,7 @@ Skill connects with skill register.
 **Answer**
 * One of:
     * OK! (Code: 201 Created)
-        * langs: array[languages] -> Which languages are present in the system
+        * langs: \[languages\] -> Which languages are present in the system
         * uniqueAuthenticationToken (If not provided before)
     * Error 401 "Unauthorized":  UniqueAuthorizationToken incorrect (either because of mismatch or because we sent an empty field but one was registered).
 
@@ -86,45 +86,46 @@ token has to be resent each time the skill wants to connect to a system.
 
 After that send:
 *POST* **Server/vap/skill_registry/register_utts** (Confirmable: Mandatory, Skill -> Registry)
-* nluData: One set per language
+* nluData:[] -> One set per language
     * language: Language
-    * intents:
+    * intents: [] ->
         * name: String
-        * utterances:
+        * utterances: [] ->
             * text: String
-        * slots: 
+        * slots:  [] ->
             * entity: String -> Name of entity.
             * required: bool -> If true the assistant must ask for it beforehand.
             * prompt: Optional<String> -> If required and not present the slot will be asked .with this.
             * reprompt: Optional<String> -> If prompt failed try with this one.
-    * entities:
+    * entities: [] ->
         * strict: bool (default: false) -> If true only the words in the list will be accepted
         * data:
             * value: String
-            * synonyms: array[String]
+            * synonyms: \[String\]
 
 **Answer**
 * Either:
     * Ok (Code: 201 Created)
-    * Error
-        * Why? 
+    * Error:
+        * An entity reference does not exist (Code: 408 Request Entity Incomplete)
+        * An unknown slot appears in the utterances (Code: 408 Request Entity Incomplete)
 
 ## Skill interactions:
 *GET* **Skill/vap/can_you_answer**  (Confirmable: Optional, Registry -> Skill)
 * request:
     * type: "event"|"intent" -> Internally tagged request data.
-    * capabilities:
+    * capabilities: [] ->
         * name: String
         * <capability data>
 
     * type: "event"
-    * Name
+    * name: String
 
     * type: "intent"
     * name: String
     * locale: Language
     * input: String
-    * slots:
+    * slots: [] ->
         * name: String
         * value: Optional<String>
 
@@ -139,14 +140,14 @@ The server is asking "Can you answer this request?"
 
 *POST* **Skill/vap/request** (Confirmable: Optional, Registry->Skill)
 * client:
-    * system_id: String -> An unique ID for the client to be recognized, it doesn't have to be the same one that client provides, can be randomly generated.
-    * capabilities:
+    * system_id: String -> An unique ID for the client to be recognized, it doesn't have to be the same one that the client provides, can be randomly generated.
+    * capabilities: [] ->
         * name: String
         * version: int
 
 * request:
     * type: "event"|"intent" -> Internally tagged request data.
-    * capabilities: Extra data sent by the client
+    * capabilities: [] -> Extra data sent by the client
         * name: String
         * <capability data>
 
@@ -157,7 +158,7 @@ The server is asking "Can you answer this request?"
     * name: String
     * locale: Language
     * input: String
-    * slots:
+    * slots: [] ->
         * name: String
         * value: Optional<String>
 
@@ -184,16 +185,31 @@ The server is asking "Can you answer this request?"
 
 
 *GET* **Server/vap/skill_registry/query** (Confirmable: Optional, Skill -> Registry)
- * Query:
-    * Data:
-        * #!TODO#!
+* data: [] -> (Can send to multiple at the same time, one per client to send)
+    * client_id: String -> System_id of client 
+    * capabilities:
+        * name: String
+        * <capability data>
  
-**Answer:**
- * Ok! (Code: 205 Content)
- * Error
-    * 403 Forbidden: If the skill is asking for a capability for which it has no permission. #!TODO#! Should the return be per-capability?
+**Answer:** (Code: 205 Content)
+ * data: [] ->
+    * client_id: String -> System_id of client 
+    * capabilities:
+        * name: String
+        * resultCode: int -> CoAP code
 
-Retrieve data from the server. *NOTE* Which data?
+        * resultCode: 205 Content
+        * <capability data>
+
+        * resultCode: 404 Not found -> Client/Capability not found
+        * #!TODO#! Some description?
+
+        * resultCode: 408 Request Entity Incomplete
+        * #!TODO#! Some description?
+
+        * resultCode: 401 Unauthorized -> Skill has not permission for this capability
+ 
+Retrieve data from the server. The data is selected by the capabilities *Note:* Are those capabilities only implemented by the server or can the clients receive/send any info?
 
 ## Shutdown
 *POST* **Server/vap/skill_registry/skill_close** (Confirmable: Mandatory, Skill -> Registry)
@@ -203,3 +219,5 @@ Retrieve data from the server. *NOTE* Which data?
 * Either:
     * OK! (Code: 202 Deleted)
     * Error:
+        * 400 Bad request: skill_id does not exist
+        * 401 Unauthorized: This skill_id is not related to this address
