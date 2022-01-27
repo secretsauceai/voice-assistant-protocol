@@ -36,7 +36,7 @@ Name of the Zeroconf service for the Client Registry "vap-client-registry.udp"
 *POST* **Server/vap/client_registry/connect** (Confirmable: Mandatory, Client -> Registry)
 * name:
 * id: String -> (like org.company.product)
-* vap_version:
+* vapVersion:
 * uniqueAuthorizationToken: 
 
 Client connects with client register. We have a uniqueAuthorizationToken, this let us know and understand that the client has been allowed in the system, and that it is who's saying to be. This is required mostly because of the possibility of user authenticaion, if any client was allowed to access the server, aunthencation would be useless, someone not allowed in the assistant could just attack the system with a hacked client.
@@ -44,11 +44,15 @@ Client connects with client register. We have a uniqueAuthorizationToken, this l
 The UniqueAuthorizationToken works just like the client one, the first time a client connects, that field is empty here and the server will asign one, which the client needs to send the next time they connect to the system. Failing this means that the client won't be allowed into the system.
 
 **Answer**
-* OK! (Code: 201 Created)
-    * UniqueAuthorizationToken: (Optional)
-    * locales: Locale
-* Errors:
-    * Which?
+* One of:
+    * OK! (Code: 201 Created)
+        * UniqueAuthorizationToken: (Optional)
+        * locales: Locale
+    * Errors:
+        * ___ #!TODO#!: This id already exists?
+        * 401 Unauthorized: UniqueAuthorizationToken wrong
+        * --- #!TODO#!: vapVersion incompatible
+        * --- #!TODO#!: connection denied by policy or by the user (maybe the user didn't accept the client or it is blocked)
 
 The server will answer a UniqueAuthorizationToken only if this is the first time the client is connecting and we don't have any record of it.
 
@@ -66,8 +70,8 @@ This signals that a client wants to start a session. At this point we can send c
 **Answer**
 * OK (Code: 201 Created)!
 * Error:
-    * User authentication (voice, face, wathever) wasn't successful
-    * Wakeword double check wasn't succesful
+    * User authentication (voice, face, wathever) wasn't successful (is this an error?)
+    * Wakeword double check wasn't succesful (is this an error?)
     * Two or more clients were activated by the same user at the same time and another got the focus. (#!TODO#!Is this technically an error?)
     * Too many clients? (#!TODO#!Is this technically an error?)
 
@@ -79,10 +83,8 @@ This signals that a client wants to start a session. At this point we can send c
 
 **Answer**
 * Ok (Code: 231 Continue)
-    * ConnectionAuthorizationToken
 * If last fragment:
     * Ok (Code: #!TODO#!)
-    * ConnectionAuthorizationToken
     * #!TODO#! Should we wait for the answer from the whole pipeline? Or rather send a "everything alright we are processing"? Note: An everything alright we are processing seems interesting from the viewpoint of a device that wants to show the user that there's processing being done.
 
 Final answer:
@@ -109,5 +111,10 @@ Final answer:
 * Either:
     * OK! (Code: 202 Deleted)
     * Error:
-        * 400 Bad request: skill_id does not exist
-        * 401 Unauthorized: This skill_id is not related to this address
+        * 400 Bad request: client_id does not exist
+            * code: int -> 400
+            * type: "wrong skill_id"
+            * object: String -> The client_id that didn't exist
+        * 401 Unauthorized: This client_id is not related to this address #!TODO#! Should this be emptier to make DDOS attacks more difficult?
+            * code: int -> 401
+            * type: "unauthorized"

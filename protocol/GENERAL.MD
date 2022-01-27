@@ -14,24 +14,47 @@ some paths have are "Confirmable: Mandatory", otherwise they'll have
 
 ## Errors
 
-#!TODO: Should error descriptions be standard?#!
 #!TODO: Content-format for deflate CBOR 11060#!
 
-If a client/skill requires something that is not found the return code would be 404.
+Error structure:
+* code: int -> Same CoAP code is in return, this might make things easier for the receiver.
+* type: String -> An string with an identifier of what happened.
+* object: Optional\<String> -> What cause the error, not every error has one.
 
-If the received data is not valid MsgPack/CBOR a 400 "Bad Request" error is returned. The server might return some info about the error. 
 
-If the message lacks a mandatory field a 408 "Request Entity Incomplete" error is returned.
+If a client/skill requires something that is not found:
 
-If a connection request has an invalid UniqueAuthenticationToken then a 401 "Unauthorized error" is returned.
+**Answer** (Code: 404 Not found)
+* code = 404
+* type = "not found"
+* object -> Path that was not found
+
+
+If the received data is not valid MsgPack/CBOR:
+
+**Answer** (Code: 400 Bad request)
+* code = 400
+* type = ""
+
+#!TODO#! The server might return some info about the error. include this
+
+
+If the message lacks a mandatory field:
+
+**Answer** (Code: 408 Request Entity Incomplete)
+* code = 408
+* type = "missing field"
+* object -> The field that was lacking
+
 
 If the message uses a method not registered by the specification (using a put instead of a POST) an implementation CAN return a 405 "Method not allowed". #!TODO: This is related to the TODO of not making use of methods#!
 
 #!TODO: Should be a 413 "Payload too large" be considered?#!
 
 
-If any content format other than "#!TODO: Choose content format code#!" the answer should be 415 "Unsupported Content-Format"
+If any content format other than "#!TODO: Choose content format code#!":
+**Answer** (Code: 415 Unsupported Content-Format)
+#!TODO#! Is anything even needed here?
+
 
 If an exception/unrecoverable error arise while processing a petition the answer will be 500, if a skill sends a 500 as an answer, the client shall receive a 500 too (#!TODO: Does this make sense?#!) along with some answer indicating of an error happening.
-
-Any answer with a wrong ConnectionAuthenticationToken can be ignored.

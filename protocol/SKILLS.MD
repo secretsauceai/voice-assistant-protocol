@@ -22,6 +22,7 @@
 * Modeled mostly after Alexa and Hermes, maybe remodel it like Google's scenes, more advanced?
 * We need a "system_id" for the "core/server/voice assistant" to be referenced.
 * Think of ways the system can ask for the skill to be accepted (it could be rejected)
+* code vs resultCode? (Try to unify errors)
 
 ## To resolve by myself
 
@@ -41,7 +42,9 @@
 
 *Note:* The path shown on each message is the CoAP URL, Server means is a path the server is listening on while Skill is the same for any skill.
 
-# Location:
+
+# Location
+
 Skills will search for the skill registry using zeroconf a.k.a bonjour a.k.a mDNS/DNS-SD
 
 Name of the Zeroconf service for the Skill Registry "vap-skill-registry.udp"
@@ -49,7 +52,7 @@ Name of the Zeroconf service for the Skill Registry "vap-skill-registry.udp"
 
 # Connection
 
-## Init:
+## Init
 
 *POST* **Server/vap/skill_registry/connect** (Confirmable: Mandatory, Skill -> Registry)
 * name: Human readable name of the skill
@@ -57,14 +60,18 @@ Name of the Zeroconf service for the Skill Registry "vap-skill-registry.udp"
 * vapVersion:
 * uniqueAuthenticationToken (Optional)
 
-Skill connects with skill register.
+Skill connects with skill register. #!TODO#! What to do with different versions?
 
-**Answer**
+**Answer:**
 * One of:
     * OK! (Code: 201 Created)
         * langs: \[languages\] -> Which languages are present in the system
         * uniqueAuthenticationToken (If not provided before)
-    * Error 401 "Unauthorized":  UniqueAuthorizationToken incorrect (either because of mismatch or because we sent an empty field but one was registered).
+    * Error:
+        * ___ #!TODO#!: This id already exists?
+        * ___ #¡TODO#!: UniqueAuthorizationToken wrong
+        * --- #!TODO#!: vapVersion incompatible
+        * --- #!TODO#!: connection denied by policy or by the user (maybe the user didn't accept the client or it is blocked)
 
 
 The authentication tokens serve so that both the skill registry and the skill know
@@ -95,28 +102,31 @@ After that send:
         * slots:  [] ->
             * entity: String -> Name of entity.
             * required: bool -> If true the assistant must ask for it beforehand.
-            * prompt: Optional<String> -> If required and not present the slot will be asked .with this.
-            * reprompt: Optional<String> -> If prompt failed try with this one.
+            * prompt: Optional\<String> -> If required and not present the slot will be asked .with this.
+            * reprompt: Optional\<String> -> If prompt failed try with this one.
     * entities: [] ->
         * strict: bool (default: false) -> If true only the words in the list will be accepted
         * data:
             * value: String
             * synonyms: \[String\]
 
-**Answer**
-* Either:
+**Answer:**
+* One of:
     * Ok (Code: 201 Created)
-    * Error:
-        * An entity reference does not exist (Code: 408 Request Entity Incomplete)
-        * An unknown slot appears in the utterances (Code: 408 Request Entity Incomplete)
+    * Error (Code: 408 Request Entity Incomplete):
+        * code: int = 408
+        * type: String = "missing entity" | "missing slot"
+        * object: String -> The entity that's missing
+
 
 ## Skill interactions:
+
 *GET* **Skill/vap/can_you_answer**  (Confirmable: Optional, Registry -> Skill)
 * request:
     * type: "event"|"intent" -> Internally tagged request data.
     * capabilities: [] ->
         * name: String
-        * <capability data>
+        * \<capability data>
 
     * type: "event"
     * name: String
@@ -127,7 +137,7 @@ After that send:
     * input: String
     * slots: [] ->
         * name: String
-        * value: Optional<String>
+        * value: Optional\<String>
 
 The server is asking "Can you answer this request?"
 
@@ -160,14 +170,16 @@ The server is asking "Can you answer this request?"
     * input: String
     * slots: [] ->
         * name: String
-        * value: Optional<String>
+        * value: Optional\<String>
 
 **Answer:** (Code: 204 Changed, a skill can return "205 Content" if no internal state changed and the same request will always return the same answer)
 * capabilities:
     * name: String
     * <capability data>
 
+
 ## At any time:
+
 *POST* **Server/vap/skill_registry/notification** (Confirmable: Optional, Skill -> Registry)
 * data: (Can send to multiple at the same time, one per client to send)
     * client_id: String -> System_id of client 
@@ -181,7 +193,7 @@ The server is asking "Can you answer this request?"
  it's a stream of sound or whether is just an alarm. Note that the server can
  also receive notifications.
 
-**TODO:**  Does this needs an answer?
+**TODO:**  Does this needs an answer? Most probably yes, otherwise they might not know if everything went ok.
 
 
 *GET* **Server/vap/skill_registry/query** (Confirmable: Optional, Skill -> Registry)
@@ -198,20 +210,25 @@ The server is asking "Can you answer this request?"
         * name: String
         * resultCode: int -> CoAP code
 
-        * resultCode: 205 Content
+        * resultCode: 205 (Content)
         * <capability data>
 
-        * resultCode: 404 Not found -> Client/Capability not found
-        * #!TODO#! Some description?
+        * resultCode: 404 (Not found) -> Client/Capability not found
+        * object: String -> What was not found
+        * kind: "client"|"capability"
 
-        * resultCode: 408 Request Entity Incomplete
-        * #!TODO#! Some description?
+        * resultCode: 408 (Request Entity Incomplete)
+        * object: String -> What was lacking
+        * type: Optional "int"|"string" .... -> The type of what is lacking
+        * doc_ref: Optional\<String> -> Some reference to documentation
 
         * resultCode: 401 Unauthorized -> Skill has not permission for this capability
  
 Retrieve data from the server. The data is selected by the capabilities *Note:* Are those capabilities only implemented by the server or can the clients receive/send any info?
 
+
 ## Shutdown
+
 *POST* **Server/vap/skill_registry/skill_close** (Confirmable: Mandatory, Skill -> Registry)
  * skill_id: (The one like org.company.product)
 
@@ -219,5 +236,10 @@ Retrieve data from the server. The data is selected by the capabilities *Note:* 
 * Either:
     * OK! (Code: 202 Deleted)
     * Error:
-        * 400 Bad request: skill_id does not exist
-        * 401 Unauthorized: This skill_id is not related to this address
+        * 400 Bad request -> skill_id does not exist
+            * code: int -> 400
+            * type: "wrong skill_id"
+            * object: String -> The skill_id that didn't exist
+        * 401 Unauthorized: This skill_id is not related to this address #!TODO#! Should this be emptier to make DDOS attacks more difficult?
+            * code: int -> 401
+            * type: "unauthorized"
