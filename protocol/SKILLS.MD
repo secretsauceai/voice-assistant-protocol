@@ -1,6 +1,6 @@
 # TODOS
 
-* Internally tagged vs externally tagged?
+* Internally tagged vs externally tagged? (both Alexa and Hermes use internally tagged, what about for languages?)
 * Better name than VAP?
 * Signals and skill queries on VAP?
     * Task polling to detect changes? (Maybe this can be done as a separate skill)
@@ -15,7 +15,9 @@
 * Instead of confirmable, can we just wait for the answer?
 * How to treat versions? As Strings, as some combination of numbers...
 * What is the type of the UniqueAuthentcationToken
-* snake_case or CamelCase?
+* snake_case or CamelCase? (snake_case is the default for HTTP, Hermes and Alexa use pascalCase)
+* pascalCase for URIs?
+* Maybe the UniqueAuthenticationToken can be adapted/related to keys in OSCORE/DTLS?
 
 ## To resolve by myself
 
@@ -43,20 +45,19 @@ Name of the Zeroconf service for the Skill Registry "vap-skill-registry.udp"
 ## Init:
 
 *POST* **Server/vap/skill_registry/connect** (Confirmable: Mandatory, Skill -> Registry)
-* Name: Human readable name of the skill
-* skill_uuid: Unique ascii based name of the skill in the form of org.company.product
-* VAP Version
-* UniqueAuthenticationToken (Optional)
+* name: Human readable name of the skill
+* id: Unique ascii based name of the skill in the form of org.company.product
+* vapVersion:
+* uniqueAuthenticationToken (Optional)
 
 Skill connects with skill register.
 
 **Answer**
 * One of:
     * OK! (Code: 201 Created)
-        * Which languages are present in the system
-        * ConnectionAuthenticationToken
-        * UniqueAuthorizationToken (If not provided before)
-    * Error  UniqueAuthorizationToken incorrect (either because of mismatch or because we sent an empty field but one was registered)
+        * langs: array[languages] -> Which languages are present in the system
+        * uniqueAuthenticationToken (If not provided before)
+    * Error  UniqueAuthenticationToken incorrect (either because of mismatch or because we sent an empty field but one was registered)
 
 
 The authentication tokens serve so that both the skill registry and the skill know
@@ -76,24 +77,13 @@ token has to be resent each time the skill wants to connect to a system.
 
 *NOTE*: This means that a skill needs permanent storage
 
-Since the UniqueAuthorizationToken is pretty valuable, it is reserved for just
-the initialization of the skill, instead, when a skill receives an answer for
-the init it also receives a ConnectionAuthorizationToken, this token only resides
-in memory and only serves for the current execution of both the server and the
-skill, this means that even if someone got ahold of this token, as long as they
-don't have access to the UniqueAuthorizationToken, a restart is all that is
-needed for security to be stablished again. This token not only protects the
-skill register agains spoofing, but also the skill itself, this way the skill
-can now reliable if a request comes from the server or not, without having to
-depend on addresses.
-
 After that send:
 *POST* **Server/vap/skill_registry/register_utts** (Confirmable: Mandatory, Skill -> Registry)
-* One set per language:
-    * Utterances
-        * Text
-        * Slots
-    * Entities
+* nluData: One set per language
+    * utterances:
+        * text: String
+        * slots:
+    * entities:
 
 **Answer**
 * Either:
@@ -103,7 +93,6 @@ After that send:
 
 ## Skill interactions:
 *GET* **Skill/vap/can_you_answer**  (Confirmable: Optional, Registry -> Skill)
-* ConnectionAuthorizationToken
 * One of:
     * Event
         * Name
@@ -114,7 +103,6 @@ After that send:
 The server is asking "Can you answer this request?"
 
 **Answer:** (Code: 205 Content)
-* ConnectionAuthorizationToken
 * Confidence: float
 
  When multiple skills are capable of answering the same request (it could be a
@@ -122,7 +110,6 @@ The server is asking "Can you answer this request?"
  estimation of how well they can answer this request.
 
 *POST* **Skill/vap/request** (Confirmable: Optional, Registry->Skill)
-* ConnectionAuthorizationToken
 * Device:
     * Capabilities
         * Name (*TODO:* Internally or externally tagged?)
@@ -137,7 +124,6 @@ The server is asking "Can you answer this request?"
         * Language: Language in which the interaction happened
 
 **Answer:** (Code: **TODO**)
-    * ConnectionAuthorizationToken
     * Data:
         * One per capability:
             * Name: (*NOTE:* Here having the capability name on the outside looks easier for the server to filter even unknown capabilities, still to be confirmed)
@@ -145,7 +131,6 @@ The server is asking "Can you answer this request?"
 
 ## At any time:
 *POST* **Server/vap/skill_registry/notification** (Confirmable: Optional, Skill -> Registry)
-* ConnectionAuthorizationToken
 * Data: (Can send to multiple at the same time, one per client to send)
     * Client name to send this to
     * One per capability:
@@ -163,13 +148,11 @@ The server is asking "Can you answer this request?"
 
 *GET* **Server/vap/skill_registry/query** (Confirmable: Optional, Skill -> Registry)
  * Query:
-    * ConnectionAuthorizationToken
     * Data:
         * 
  
 **Answer:**
  * Ok! (Code: 205 Content)
-    * ConnectionAuthorizationToken
  * Error
     * **TODO:** Which errors?
 
@@ -178,7 +161,6 @@ Retrieve data from the server. *NOTE* Which data?
 ## Shutdown
 *POST* **Server/vap/skill_registry/skill_close** (Confirmable: Mandatory, Skill -> Registry)
  * skill_id: (The one like org.company.product)
- * ConnectionAuthoriztionToken
 
 * Answer?
     * Whether it worked?
