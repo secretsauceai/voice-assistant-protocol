@@ -25,12 +25,15 @@
 
 ## To resolve by myself
 
-* Specify language negotiation strategy (first analyze them and then show possible answers). Available in fluent-langneg:
+* Specify language negotiation strategy (first analyze them and then show possible answers). Available in fluent-langneg (https://docs.rs/fluent-langneg/latest/fluent_langneg/negotiate/index.html):
     * Exact match
-    * Locale range
+    * Local e range
     * Use ICU LikelySubtags
     * Different variant of the same locale
-    * 
+    * Only consider language stripped and then maximize it
+    * Different region same locale (I like this one, easy to implement and good results)
+* CoAP discovery vs Zeroconf
+* CBOR Vs MsgPack
 
 ## To check by others
 
@@ -61,7 +64,7 @@ Skill connects with skill register.
     * OK! (Code: 201 Created)
         * langs: array[languages] -> Which languages are present in the system
         * uniqueAuthenticationToken (If not provided before)
-    * Error  UniqueAuthenticationToken incorrect (either because of mismatch or because we sent an empty field but one was registered)
+    * Error 401 "Unauthorized":  UniqueAuthorizationToken incorrect (either because of mismatch or because we sent an empty field but one was registered).
 
 
 The authentication tokens serve so that both the skill registry and the skill know
@@ -183,12 +186,12 @@ The server is asking "Can you answer this request?"
 *GET* **Server/vap/skill_registry/query** (Confirmable: Optional, Skill -> Registry)
  * Query:
     * Data:
-        * 
+        * #!TODO#!
  
 **Answer:**
  * Ok! (Code: 205 Content)
  * Error
-    * **TODO:** Which errors?
+    * 403 Forbidden: If the skill is asking for a capability for which it has no permission. #!TODO#! Should the return be per-capability?
 
 Retrieve data from the server. *NOTE* Which data?
 
@@ -196,19 +199,7 @@ Retrieve data from the server. *NOTE* Which data?
 *POST* **Server/vap/skill_registry/skill_close** (Confirmable: Mandatory, Skill -> Registry)
  * skill_id: (The one like org.company.product)
 
-* Answer?
-    * Whether it worked?
-
-# Capabilities
-
-## Log
-
-This capability would let you log things into the server. They can be seen by the server and by the user. How they are presented to the user is up to to both the server and the clients.
-
-Expected to be received as notifications.
-
-## Dynamic NLU
-
-Add Utterances after the initial set is sent, this is specially interesting for services like music streaming or home automation that the names aren't know until runtime, or even that the can change.
-
-Expected to be received as notifications.
+**Answer**:
+* Either:
+    * OK! (Code: 202 Deleted)
+    * Error:
