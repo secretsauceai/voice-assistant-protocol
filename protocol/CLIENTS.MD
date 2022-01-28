@@ -13,12 +13,13 @@
 * Is UniqueAuthenticationTokenRequired on the clients?
 * Context data should be handled here?
 * Think of ways the system can ask for the client to be accepted into the network (it could be rejected)
+* Is timestamp really needed for simultaneous activation checking?
 
 ## To resolve by myself
 
 * Some sort of recovery mechanism in case the client "forgets" their UniqueAuthorizationSkill or it becomes corrupted?
 * What happens if a single address registers multiple IDs from other clients, therefore preventing them to be connected?
-* Can we detect that a ConnectionAuthorizationToken or a GlobalAuthorizationToken has been compromised? Should we include any mechanism to change it? (Note: Even if we can detect that, maybe we don't need an explicit mechanism, but rather just closing down the connection and starting it again, how would this affect users?).
+* Can we detect that a GlobalAuthorizationToken has been compromised? Should we include any mechanism to change it? (Note: Even if we can detect that, maybe we don't need an explicit mechanism, but rather just closing down the connection and starting it again, how would this affect users?).
 * A session_start rejected because of two simulatenous activations should be considered an error?
 * ASR, NLU and Skills might take a while, should we send a "temporal answer" to a session start.
 * A client needs to know about languages in the server? Should it be able to choose a prefered one if there are multiple? I think yes.
@@ -37,24 +38,28 @@ Name of the Zeroconf service for the Client Registry "vap-client-registry.udp"
 * name:
 * id: String -> (like org.company.product)
 * vapVersion:
-* uniqueAuthorizationToken: 
+* uniqueAuthenticationToken: 
 
-Client connects with client register. We have a uniqueAuthorizationToken, this let us know and understand that the client has been allowed in the system, and that it is who's saying to be. This is required mostly because of the possibility of user authenticaion, if any client was allowed to access the server, aunthencation would be useless, someone not allowed in the assistant could just attack the system with a hacked client.
+Client connects with client register. We have a uniqueAuthenticationToken, this let us know and understand that the client has been allowed in the system, and that it is who's saying to be. This is required mostly because of the possibility of user authenticaion, if any client was allowed to access the server, aunthencation would be useless, someone not allowed in the assistant could just attack the system with a hacked client.
 
-The UniqueAuthorizationToken works just like the client one, the first time a client connects, that field is empty here and the server will asign one, which the client needs to send the next time they connect to the system. Failing this means that the client won't be allowed into the system.
+The uniqueAuthenticationToken works just like the skills one, the first time a client connects, that field is empty here and the server will asign one, which the client needs to send the next time they connect to the system. Failing this means that the client won't be allowed into the system.
 
 **Answer**
 * One of:
     * OK! (Code: 201 Created)
-        * UniqueAuthorizationToken: (Optional)
+        * UniqueAuthenticationToken: (Optional)
         * locales: Locale
     * Errors:
-        * ___ #!TODO#!: This id already exists?
-        * 401 Unauthorized: UniqueAuthorizationToken wrong
-        * --- #!TODO#!: vapVersion incompatible
-        * --- #!TODO#!: connection denied by policy or by the user (maybe the user didn't accept the client or it is blocked)
+        * 400 Bad Request: Id already exists? (should Ids be unique?)
+        * 400 Bad Request: vapVersion incompatible
+        * 401 Unauthorized: uniqueAuthenticationToken wrong
+            * code = 401
+            * type = "uniqueAuthenticationTokenErronous"
+        * 401 Unauthorized: connection denied by policy or by the user (maybe the user didn't accept the client or it is blocked)
+            * code = 401
+            * type = "connectionDenied"
 
-The server will answer a UniqueAuthorizationToken only if this is the first time the client is connecting and we don't have any record of it.
+The server will answer a UniqueAuthenticationToken only if this is the first time the client is connecting and we don't have any record of it.
 
 ## Session start
 
@@ -62,8 +67,7 @@ The server will answer a UniqueAuthorizationToken only if this is the first time
 * capabilities: Optional<[]> ->
     * name: String
     * <capability data>
-* connectionAuthorizationToken
-* exactTimeStamp:  #!TODO#! Is this really needed?
+* exactTimeStamp:?
 
 This signals that a client wants to start a session. At this point we can send capabilities too, they are meant for user authorization and wake word double checking (with a bigger, slower, more accurate model in the server). Of course, the server is free to either accept it or reject if because of any reason.
 
@@ -84,7 +88,7 @@ This signals that a client wants to start a session. At this point we can send c
 **Answer**
 * Ok (Code: 231 Continue)
 * If last fragment:
-    * Ok (Code: #!TODO#!)
+    * Ok (Code: 201 Created) #!TODO#! Should we allow for cacheable responses with 205 for those that the skill said it was cacheable?
     * #!TODO#! Should we wait for the answer from the whole pipeline? Or rather send a "everything alright we are processing"? Note: An everything alright we are processing seems interesting from the viewpoint of a device that wants to show the user that there's processing being done.
 
 Final answer:

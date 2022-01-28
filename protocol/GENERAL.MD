@@ -20,9 +20,10 @@ Error structure:
 * code: int -> Same CoAP code is in return, this might make things easier for the receiver.
 * type: String -> An string with an identifier of what happened.
 * object: Optional\<String> -> What cause the error, not every error has one.
+* docRef: Optional\<String> -> Some online documentation about the error.
 
 
-If a client/skill requires something that is not found:
+If a client/skill (or a server from them) requires something that is not found:
 
 **Answer** (Code: 404 Not found)
 * code = 404
@@ -34,7 +35,7 @@ If the received data is not valid MsgPack/CBOR:
 
 **Answer** (Code: 400 Bad request)
 * code = 400
-* type = ""
+* type = "malformed content"
 
 #!TODO#! The server might return some info about the error. include this
 

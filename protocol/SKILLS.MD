@@ -7,7 +7,7 @@
 * Context data in request (and maybe in "can answer"), user input, confidence, slots ...
 * Should capabilities be written as organization.name (like vap.dyn_nlu or lily.custom_capability)?
 * How to resolve a skill that changes server? Maybe we can use the zeroconf name? What alternative do we have if zeroconf is optional?
-* The capabilities of the client are needed for the CanAnswer?
+* The capabilities of the client are needed for the canAnswer?
 * Think on addresses of registries, if making them not to change would be an improvement on security, if so by how much?.
 * TCP or UDP?
 * Given that any path does not implement two methods, how about they are ignored?
@@ -15,14 +15,12 @@
 * Instead of confirmable, can we just wait for the answer?
 * How to treat versions? As Strings, as some combination of numbers...
 * What is the type of the UniqueAuthentcationToken
-* pascalCase for URIs?
-* Maybe the UniqueAuthenticationToken can be adapted/related to keys in OSCORE/DTLS?
+* Maybe the uniqueAuthenticationToken can be adapted/related to keys in OSCORE/DTLS?
 * Can we deal with differences in how a required slot is asked?
 * Is every NLU capable of being strict (like in register utterances)?
 * Modeled mostly after Alexa and Hermes, maybe remodel it like Google's scenes, more advanced?
 * We need a "systemId" for the "core/server/voice assistant" to be referenced.
 * Think of ways the system can ask for the skill to be accepted (it could be rejected)
-* code vs resultCode? (Try to unify errors)
 
 ## To resolve by myself
 
@@ -68,10 +66,14 @@ Skill connects with skill register. #!TODO#! What to do with different versions?
         * langs: \[languages\] -> Which languages are present in the system
         * uniqueAuthenticationToken (If not provided before)
     * Error:
-        * ___ #!TODO#!: This id already exists?
-        * ___ #¡TODO#!: UniqueAuthorizationToken wrong
-        * --- #!TODO#!: vapVersion incompatible
-        * --- #!TODO#!: connection denied by policy or by the user (maybe the user didn't accept the client or it is blocked)
+        * 400 Bad Request: Id already exists? (should Ids be unique?)
+        * 400 Bad Request: vapVersion incompatible
+        * 401 Unauthorized: uniqueAuthenticationToken wrong
+            * code = 401
+            * type = "uniqueAuthenticationTokenErronous"
+        * 401 Unauthorized: connection denied by policy or by the user (maybe the user didn't accept the client or it is blocked)
+            * code = 401
+            * type = "connectionDenied"
 
 
 The authentication tokens serve so that both the skill registry and the skill know
@@ -208,21 +210,21 @@ The server is asking "Can you answer this request?"
     * clientId: String -> SystemId of client 
     * capabilities:
         * name: String
-        * resultCode: int -> CoAP code
+        * code: int -> CoAP result code
 
-        * resultCode: 205 (Content)
+        * code: 205 (Content)
         * <capability data>
 
-        * resultCode: 404 (Not found) -> Client/Capability not found
+        * code: 404 (Not found) -> Client/Capability not found
         * object: String -> What was not found
         * kind: "client"|"capability"
 
-        * resultCode: 408 (Request Entity Incomplete)
+        * code: 408 (Request Entity Incomplete)
         * object: String -> What was lacking
         * type: Optional "int"|"string" .... -> The type of what is lacking
         * docRef: Optional\<String> -> Some reference to documentation
 
-        * resultCode: 401 Unauthorized -> Skill has not permission for this capability
+        * code: 401 Unauthorized -> Skill has not permission for this capability
  
 Retrieve data from the server. The data is selected by the capabilities *Note:* Are those capabilities only implemented by the server or can the clients receive/send any info?
 
