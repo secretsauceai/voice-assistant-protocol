@@ -124,7 +124,7 @@ impl SkillRegister {
             match *request.get_method() {
                 Method::Get => {
                     match request.get_path().as_str() {
-                        "vap/skill_registry/query" => {
+                        "vap/skillRegistry/query" => {
                             handle_msg(request, &mut in_send, |p|{SkillRegisterMessage::Query(p)}).await
                         }
 
@@ -134,19 +134,19 @@ impl SkillRegister {
 
                 Method::Post => {                 
                     match request.get_path().as_str() {
-                        "vap/skill_registry/connect" => {
+                        "vap/skillRegistry/connect" => {
                             handle_msg(request, &mut in_send, |p|{SkillRegisterMessage::Connect(p)}).await
                         }
 
-                        "vap/skill_registry/register_utts" => {
+                        "vap/skillRegistry/registerUtts" => {
                             handle_msg(request, &mut in_send, |p|{SkillRegisterMessage::RegisterUtts(p)}).await
                         }
 
-                        "vap/skill_registry/notification" => {
+                        "vap/skillRegistry/notification" => {
                             handle_msg(request, &mut in_send, |p|{SkillRegisterMessage::Notification(p)}).await
                         }
 
-                        "vap/skill_registry/skill_close" => {
+                        "vap/skillRegistry/skillClose" => {
                             handle_msg(request, &mut in_send, |p|{SkillRegisterMessage::Close(p)}).await
                         }
 
@@ -176,7 +176,7 @@ impl SkillRegister {
             let c = CoAPClient::new(ip).unwrap();
             let msg = MsgSkillCanAnswer{};
             let data = rmp_serde::to_vec(&msg).unwrap();
-            let resp = c.request_path("vap/can_you_answer", Method::Get, Some(data), None).unwrap();
+            let resp = c.request_path("vap/canYouAnswer", Method::Get, Some(data), None).unwrap();
             let resp_data = rmp_serde::from_read(Cursor::new(resp.message.payload)).unwrap();
             Ok(resp_data)
         }
@@ -201,7 +201,7 @@ impl SkillRegister {
     pub async fn activate_skill(&mut self, ip: String, msg: MsgSkillAnswer) -> Result<MsgSkillAnswerResponse, Error> {
         let c = CoAPClient::new(ip).unwrap();
         let data = rmp_serde::to_vec(&msg).unwrap();
-        let resp = c.request_path("vap/can_you_answer", Method::Get, Some(data), None).unwrap();
+        let resp = c.request_path("vap/canYouAnswer", Method::Get, Some(data), None).unwrap();
         let resp_data = rmp_serde::from_read(Cursor::new(resp.message.payload)).unwrap();
         Ok(resp_data)
     }
