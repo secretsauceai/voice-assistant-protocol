@@ -20,7 +20,7 @@
 * Can we deal with differences in how a required slot is asked?
 * Is every NLU capable of being strict (like in register utterances)?
 * Modeled mostly after Alexa and Hermes, maybe remodel it like Google's scenes, more advanced?
-* We need a "system_id" for the "core/server/voice assistant" to be referenced.
+* We need a "systemId" for the "core/server/voice assistant" to be referenced.
 * Think of ways the system can ask for the skill to be accepted (it could be rejected)
 * code vs resultCode? (Try to unify errors)
 
@@ -54,7 +54,7 @@ Name of the Zeroconf service for the Skill Registry "vap-skill-registry.udp"
 
 ## Init
 
-*POST* **Server/vap/skill_registry/connect** (Confirmable: Mandatory, Skill -> Registry)
+*POST* **Server/vap/skillRegistry/connect** (Confirmable: Mandatory, Skill -> Registry)
 * name: Human readable name of the skill
 * id: Unique ascii based name of the skill in the form of org.company.product
 * vapVersion:
@@ -92,7 +92,7 @@ token has to be resent each time the skill wants to connect to a system.
 *NOTE*: This means that a skill needs permanent storage
 
 After that send:
-*POST* **Server/vap/skill_registry/register_utts** (Confirmable: Mandatory, Skill -> Registry)
+*POST* **Server/vap/skillRegistry/registerUtts** (Confirmable: Mandatory, Skill -> Registry)
 * nluData:[] -> One set per language
     * language: Language
     * intents: [] ->
@@ -121,7 +121,7 @@ After that send:
 
 ## Skill interactions:
 
-*GET* **Skill/vap/can_you_answer**  (Confirmable: Optional, Registry -> Skill)
+*GET* **Skill/vap/canYouAnswer**  (Confirmable: Optional, Registry -> Skill)
 * request:
     * type: "event"|"intent" -> Internally tagged request data.
     * capabilities: [] ->
@@ -150,7 +150,7 @@ The server is asking "Can you answer this request?"
 
 *POST* **Skill/vap/request** (Confirmable: Optional, Registry->Skill)
 * client:
-    * system_id: String -> An unique ID for the client to be recognized, it doesn't have to be the same one that the client provides, can be randomly generated.
+    * systemId: String -> An unique ID for the client to be recognized, it doesn't have to be the same one that the client provides, can be randomly generated.
     * capabilities: [] ->
         * name: String
         * version: int
@@ -180,9 +180,9 @@ The server is asking "Can you answer this request?"
 
 ## At any time:
 
-*POST* **Server/vap/skill_registry/notification** (Confirmable: Optional, Skill -> Registry)
+*POST* **Server/vap/skillRegistry/notification** (Confirmable: Optional, Skill -> Registry)
 * data: (Can send to multiple at the same time, one per client to send)
-    * client_id: String -> System_id of client 
+    * clientId: String -> SystemId of client 
     * capabilities:
         * name: String
         * <capability data>
@@ -196,16 +196,16 @@ The server is asking "Can you answer this request?"
 **TODO:**  Does this needs an answer? Most probably yes, otherwise they might not know if everything went ok.
 
 
-*GET* **Server/vap/skill_registry/query** (Confirmable: Optional, Skill -> Registry)
+*GET* **Server/vap/skillRegistry/query** (Confirmable: Optional, Skill -> Registry)
 * data: [] -> (Can send to multiple at the same time, one per client to send)
-    * client_id: String -> System_id of client 
+    * clientId: String -> SystemId of client 
     * capabilities:
         * name: String
         * <capability data>
  
 **Answer:** (Code: 205 Content)
  * data: [] ->
-    * client_id: String -> System_id of client 
+    * clientId: String -> SystemId of client 
     * capabilities:
         * name: String
         * resultCode: int -> CoAP code
@@ -220,7 +220,7 @@ The server is asking "Can you answer this request?"
         * resultCode: 408 (Request Entity Incomplete)
         * object: String -> What was lacking
         * type: Optional "int"|"string" .... -> The type of what is lacking
-        * doc_ref: Optional\<String> -> Some reference to documentation
+        * docRef: Optional\<String> -> Some reference to documentation
 
         * resultCode: 401 Unauthorized -> Skill has not permission for this capability
  
@@ -229,17 +229,17 @@ Retrieve data from the server. The data is selected by the capabilities *Note:* 
 
 ## Shutdown
 
-*POST* **Server/vap/skill_registry/skill_close** (Confirmable: Mandatory, Skill -> Registry)
- * skill_id: (The one like org.company.product)
+*POST* **Server/vap/skillRegistry/skillClose** (Confirmable: Mandatory, Skill -> Registry)
+ * skillId: (The one like org.company.product)
 
 **Answer**:
 * Either:
     * OK! (Code: 202 Deleted)
     * Error:
-        * 400 Bad request -> skill_id does not exist
+        * 400 Bad request -> skillId does not exist
             * code: int -> 400
-            * type: "wrong skill_id"
-            * object: String -> The skill_id that didn't exist
-        * 401 Unauthorized: This skill_id is not related to this address #!TODO#! Should this be emptier to make DDOS attacks more difficult?
+            * type: "wrong skillId"
+            * object: String -> The skillId that didn't exist
+        * 401 Unauthorized: This skillId is not related to this address #!TODO#! Should this be emptier to make DDOS attacks more difficult?
             * code: int -> 401
             * type: "unauthorized"

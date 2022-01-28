@@ -33,7 +33,7 @@ Name of the Zeroconf service for the Client Registry "vap-client-registry.udp"
 
 ## Init:
 
-*POST* **Server/vap/client_registry/connect** (Confirmable: Mandatory, Client -> Registry)
+*POST* **Server/vap/clientRegistry/connect** (Confirmable: Mandatory, Client -> Registry)
 * name:
 * id: String -> (like org.company.product)
 * vapVersion:
@@ -58,12 +58,12 @@ The server will answer a UniqueAuthorizationToken only if this is the first time
 
 ## Session start
 
-*POST* **Server/vap/client_registry/session_start** (Confirmable: Optional, Client -> Registry)
+*POST* **Server/vap/clientRegistry/sessionStart** (Confirmable: Optional, Client -> Registry)
 * capabilities: Optional<[]> ->
     * name: String
     * <capability data>
-* ConnectionAuthorizationToken
-* ExactTimeStamp:  #!TODO#! Is this really needed?
+* connectionAuthorizationToken
+* exactTimeStamp:  #!TODO#! Is this really needed?
 
 This signals that a client wants to start a session. At this point we can send capabilities too, they are meant for user authorization and wake word double checking (with a bigger, slower, more accurate model in the server). Of course, the server is free to either accept it or reject if because of any reason.
 
@@ -75,11 +75,11 @@ This signals that a client wants to start a session. At this point we can send c
     * Two or more clients were activated by the same user at the same time and another got the focus. (#!TODO#!Is this technically an error?)
     * Too many clients? (#!TODO#!Is this technically an error?)
 
-*POST* **Server/vap/client_registry/session_data** (Confirmable: Optional, Client -> Registry)
+*POST* **Server/vap/clientRegistry/sessionData** (Confirmable: Optional, Client -> Registry)
 * capabilities: [] ->
     * name: String
     * <capability data>
-* last_fragment: bool
+* lastFragment: bool
 
 **Answer**
 * Ok (Code: 231 Continue)
@@ -91,7 +91,7 @@ Final answer:
 * capabilities: [] ->
     * name: String
     * <capability data>
-* end_session: bool
+* endSession: bool
 
 ## On Anytime
 
@@ -104,17 +104,17 @@ Final answer:
 
 ## When closing
 
-*POST* **Server/vap/client_registry/client_close** (Confirmable: Mandatory, Client -> Registry)
-* client_id: (The one like org.company.product)  
+*POST* **Server/vap/clientRegistry/clientClose** (Confirmable: Mandatory, Client -> Registry)
+* clientId: (The one like org.company.product)  
 
 **Answer**:
 * Either:
     * OK! (Code: 202 Deleted)
     * Error:
-        * 400 Bad request: client_id does not exist
+        * 400 Bad request: clientId does not exist
             * code: int -> 400
-            * type: "wrong skill_id"
-            * object: String -> The client_id that didn't exist
-        * 401 Unauthorized: This client_id is not related to this address #!TODO#! Should this be emptier to make DDOS attacks more difficult?
+            * type: "wrong clientId"
+            * object: String -> The clientId that didn't exist
+        * 401 Unauthorized: This clientId is not related to this address #!TODO#! Should this be emptier to make DDOS attacks more difficult?
             * code: int -> 401
             * type: "unauthorized"
