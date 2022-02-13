@@ -8,7 +8,7 @@ Here you will find:
 
 * **Specification:** Inside the `protocol` folder, the specification itself and how it works.
 
-* **Implementations:**Inside `vap-client-register`, `vap-common`, `vap-common-client`, `vap-common-skill`, `vap-skill-register` and `vap-python-skill` folders are the reference implementations. The skill client code is in Python, for better accessibility while everything else is in Rust for running it even on devices with limited capabilities.
+* **Implementations:** Inside `vap-client-register`, `vap-common`, `vap-common-client`, `vap-common-skill`, `vap-skill-register` and `vap-python-skill` folders are the reference implementations. The skill client code is in Python, for better accessibility while everything else is in Rust for running it even on devices with limited capabilities.
 
 ## Implementations
 
