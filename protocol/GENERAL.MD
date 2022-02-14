@@ -12,6 +12,17 @@ CoAP calls messages that must have their arrival confirmed as confirmable,
 some paths have are "Confirmable: Mandatory", otherwise they'll have 
 "Confirmable: Optional".
 
+## Architecture
+
+All parts of the structure (registries, clients, skills) send and receive messages
+and as so, all of them need to implement both a client and a server. Clients and skills can expect that the only one connecting to them is the server (though be aware of attackers if they are accesible by internet), in the case of skills, the server can send multiple concurrent requests, the skill is free to answer them in any order.
+
+### Grouping
+
+If a server receives many notifications request from several skills, and they
+target the same client, the server is free to group them by clients and send one
+notification to the client with capabilities from multiple skills.
+
 ## Errors
 
 #!TODO: Content-format for deflate CBOR 11060#!

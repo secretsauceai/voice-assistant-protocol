@@ -102,6 +102,7 @@ Final answer:
 *POST* **Client/vap/notification** (Confirmable: Optional, Registry -> Client)
 * capabilities: [] ->
     * name: String
+    * from: String -> Skill name, can also be the system itself.
     * <capability data>
 
 #!TODO#! Does this need an answer? An alternative could be to propose having it as confirmable.
