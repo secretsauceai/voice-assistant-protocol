@@ -26,7 +26,7 @@ pub struct MsgConnectResponse {
 
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct MsgRegisterUtts {
+pub struct MsgRegisterIntents {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -42,7 +42,7 @@ pub struct Language { // Better this or a single string?
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct MsgRegisterUttsResponse {
+pub struct MsgRegisterIntentsResponse {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -39,7 +39,7 @@ pub struct SkillRegister {
 
 pub enum SkillRegisterMessage {
     Connect(MsgConnect),
-    RegisterUtts(MsgRegisterUtts),
+    RegisterIntents(MsgRegisterIntents),
     Notification(MsgNotification),
     Query(MsgQuery),
     Close(MsgSkillClose),
@@ -138,8 +138,8 @@ impl SkillRegister {
                             handle_msg(request, &mut in_send, |p|{SkillRegisterMessage::Connect(p)}).await
                         }
 
-                        "vap/skillRegistry/registerUtts" => {
-                            handle_msg(request, &mut in_send, |p|{SkillRegisterMessage::RegisterUtts(p)}).await
+                        "vap/skillRegistry/registerIntents" => {
+                            handle_msg(request, &mut in_send, |p|{SkillRegisterMessage::RegisterIntents(p)}).await
                         }
 
                         "vap/skillRegistry/notification" => {

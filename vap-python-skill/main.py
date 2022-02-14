@@ -82,7 +82,7 @@ class VapClient():
         resp_payload = msgpack.unpackb(response.payload)
         print(f"Languages available: {','.join(resp_payload['languages'])}")
 
-    async def registerUtts(self):
+    async def registerIntents(self):
         # Send our utterances to the server for them to be taken account of
 
         payload = {
@@ -115,7 +115,7 @@ class VapClient():
         }
         
         # Create message
-        request = aiocoap.Message(code=aiocoap.GET, payload=msgpack.packb(payload), uri=f'coap://{registry_address}/vap/skillRegistry/registerUtts')
+        request = aiocoap.Message(code=aiocoap.GET, payload=msgpack.packb(payload), uri=f'coap://{registry_address}/vap/skillRegistry/registerIntents')
 
         response = await self.client.request(request).response
 
@@ -198,7 +198,7 @@ async def main():
 
     # Connect to the skill registry and send utterances and 
     await client.init()
-    await client.registerUtts()
+    await client.registerIntents()
 
     # Register the CoAP paths that we can answer
     root = resource.Site()
