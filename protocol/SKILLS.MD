@@ -1,46 +1,3 @@
-# TODOS
-
-* Internally tagged vs externally tagged? (both Alexa and Hermes use internally tagged)
-* Better name than VAP?
-* Signals and skill queries on VAP?
-    * Task polling to detect changes? (Maybe this can be done as a separate skill)
-* Context data in request (and maybe in "can answer"), user input, confidence, slots ...
-* Should capabilities be written as organization.name (like vap.dyn_nlu or lily.custom_capability)?
-* How to resolve a skill that changes server? Maybe we can use the zeroconf name? What alternative do we have if zeroconf is optional?
-* The capabilities of the client are needed for the canAnswer?
-* Think on addresses of registries, if making them not to change would be an improvement on security, if so by how much?.
-* TCP or UDP?
-* Given that any path does not implement two methods, how about they are ignored?
-* Should we join server queries and notifications using GET/POST into just one path? Queries would use GET and notifications POST.
-* Instead of confirmable, can we just wait for the answer?
-* How to treat versions? As Strings, as some combination of numbers...
-* What is the type of the UniqueAuthentcationToken
-* Maybe the uniqueAuthenticationToken can be adapted/related to keys in OSCORE/DTLS?
-* Can we deal with differences in how a required slot is asked?
-* Is every NLU capable of being strict (like in register utterances)?
-* Modeled mostly after Alexa and Hermes, maybe remodel it like Google's scenes, more advanced?
-* We need a "systemId" for the "core/server/voice assistant" to be referenced.
-* Think of ways the system can ask for the skill to be accepted (it could be rejected)
-
-## To resolve by myself
-
-* Specify language negotiation strategy (first analyze them and then show possible answers). Available in fluent-langneg (https://docs.rs/fluent-langneg/latest/fluent_langneg/negotiate/index.html):
-    * Exact match
-    * Locale range
-    * Use ICU LikelySubtags
-    * Different variant of the same locale
-    * Only consider language stripped and then maximize it
-    * Different region same locale (I like this one, easy to implement and good results)
-* CoAP discovery vs Zeroconf
-* CBOR Vs MsgPack
-
-## To check by others
-
-"vap-skill-registry" service name
-
-*Note:* The path shown on each message is the CoAP URL, Server means is a path the server is listening on while Skill is the same for any skill.
-
-
 # Location
 
 Skills will search for the skill registry using zeroconf a.k.a bonjour a.k.a mDNS/DNS-SD
@@ -58,7 +15,7 @@ Name of the Zeroconf service for the Skill Registry "vap-skill-registry.udp"
 * vapVersion:
 * uniqueAuthenticationToken (Optional)
 
-Skill connects with skill register. #!TODO#! What to do with different versions?
+Skill connects with skill register.
 
 **Answer:**
 * One of:
@@ -94,7 +51,7 @@ token has to be resent each time the skill wants to connect to a system.
 *NOTE*: This means that a skill needs permanent storage
 
 After that send:
-*POST* **Server/vap/skillRegistry/registerUtts** (Confirmable: Mandatory, Skill -> Registry)
+*POST* **Server/vap/skillRegistry/registerIntents** (Confirmable: Mandatory, Skill -> Registry)
 * nluData:[] -> One set per language
     * language: Language
     * intents: [] ->
@@ -131,10 +88,10 @@ After that send:
         * \<capability data>
 
     * type: "event"
-    * name: String
+    * event: String
 
     * type: "intent"
-    * name: String
+    * intent: String
     * locale: Language
     * input: String
     * slots: [] ->
@@ -164,10 +121,10 @@ The server is asking "Can you answer this request?"
         * <capability data>
 
     * type: "event"
-    * Name
+    * event: String
 
     * type: "intent"
-    * name: String
+    * intent: String
     * locale: Language
     * input: String
     * slots: [] ->
@@ -194,8 +151,6 @@ The server is asking "Can you answer this request?"
  information on it's own, not as an answer to something the user asked, whether
  it's a stream of sound or whether is just an alarm. Note that the server can
  also receive notifications.
-
-**TODO:**  Does this needs an answer? Most probably yes, otherwise they might not know if everything went ok.
 
 
 *GET* **Server/vap/skillRegistry/query** (Confirmable: Optional, Skill -> Registry)
@@ -238,10 +193,10 @@ Retrieve data from the server. The data is selected by the capabilities *Note:* 
 * Either:
     * OK! (Code: 202 Deleted)
     * Error:
-        * 400 Bad request -> skillId does not exist
+        * 400 Bad >request -> skillId does not exist
             * code: int -> 400
             * type: "wrong skillId"
             * object: String -> The skillId that didn't exist
-        * 401 Unauthorized: This skillId is not related to this address #!TODO#! Should this be emptier to make DDOS attacks more difficult?
+        * 401 Unauthorized: This skillId is not related to this address.
             * code: int -> 401
             * type: "unauthorized"

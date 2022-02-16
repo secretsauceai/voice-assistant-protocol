@@ -25,8 +25,6 @@ notification to the client with capabilities from multiple skills.
 
 ## Errors
 
-#!TODO: Content-format for deflate CBOR 11060#!
-
 Error structure:
 * code: int -> Same CoAP code is in return, this might make things easier for the receiver.
 * type: String -> An string with an identifier of what happened.
@@ -48,8 +46,6 @@ If the received data is not valid MsgPack/CBOR:
 * code = 400
 * type = "malformed content"
 
-#!TODO#! The server might return some info about the error. include this
-
 
 If the message lacks a mandatory field:
 
@@ -59,14 +55,14 @@ If the message lacks a mandatory field:
 * object -> The field that was lacking
 
 
-If the message uses a method not registered by the specification (using a put instead of a POST) an implementation CAN return a 405 "Method not allowed". #!TODO: This is related to the TODO of not making use of methods#!
-
-#!TODO: Should be a 413 "Payload too large" be considered?#!
-
+If the message uses a method not registered by the specification (using a put instead of a POST) an implementation CAN return a 405 "Method not allowed".
 
 If any content format other than "#!TODO: Choose content format code#!":
 **Answer** (Code: 415 Unsupported Content-Format)
-#!TODO#! Is anything even needed here?
 
 
-If an exception/unrecoverable error arise while processing a petition the answer will be 500, if a skill sends a 500 as an answer, the client shall receive a 500 too (#!TODO: Does this make sense?#!) along with some answer indicating of an error happening.
+If an exception/unrecoverable error arise while processing a petition the answer will be 500, if a skill sends a 500 as an answer, the client shall receive a 500 too along with some answer indicating of an error happening.
+
+# IP Addresses
+
+IP addresses should never be tracked, as they could change due to a network change, or in the case of registries a system might employ several registry nodes, and the one you send the connect request might not be the one the system assigned the skill/client to.

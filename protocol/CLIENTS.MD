@@ -1,30 +1,4 @@
-
-
-# TODOS
-
-* Internally tagged vs externally tagged
-* Should capabilities be written as organization.name (like vap.dyn_nlu or lily.custom_capability)?
-* How to resolve a skill that changes server? Maybe we can use the zeroconf name? What alternative do we have if zeroconf is optional?
-* Think on addresses of registries, if making them not to change would be an improvement on security, if so by how much?.
-* TCP or UDP?
-* Given that any path does not implement two methods, how about they are ignored?
-* Instead of confirmable, can we just wait for the answer?
-* Should session data be preferably non-confirmable?
-* Is UniqueAuthenticationTokenRequired on the clients?
-* Context data should be handled here?
-* Think of ways the system can ask for the client to be accepted into the network (it could be rejected)
-* Is timestamp really needed for simultaneous activation checking?
-
-## To resolve by myself
-
-* Some sort of recovery mechanism in case the client "forgets" their UniqueAuthorizationSkill or it becomes corrupted?
-* What happens if a single address registers multiple IDs from other clients, therefore preventing them to be connected?
-* Can we detect that a GlobalAuthorizationToken has been compromised? Should we include any mechanism to change it? (Note: Even if we can detect that, maybe we don't need an explicit mechanism, but rather just closing down the connection and starting it again, how would this affect users?).
-* A session_start rejected because of two simulatenous activations should be considered an error?
-* ASR, NLU and Skills might take a while, should we send a "temporal answer" to a session start.
-* A client needs to know about languages in the server? Should it be able to choose a prefered one if there are multiple? I think yes.
-
-# Location:
+# Location
 
 Clients will search for the client registry using zeroconf or CoAP 
 
@@ -32,7 +6,7 @@ Name of the Zeroconf service for the Client Registry "vap-client-registry.udp"
 
 # Connection
 
-## Init:
+## Init
 
 *POST* **Server/vap/clientRegistry/connect** (Confirmable: Mandatory, Client -> Registry)
 * name:
@@ -74,10 +48,10 @@ This signals that a client wants to start a session. At this point we can send c
 **Answer**
 * OK (Code: 201 Created)!
 * Error:
-    * User authentication (voice, face, wathever) wasn't successful (is this an error?)
-    * Wakeword double check wasn't succesful (is this an error?)
-    * Two or more clients were activated by the same user at the same time and another got the focus. (#!TODO#!Is this technically an error?)
-    * Too many clients? (#!TODO#!Is this technically an error?)
+    * User authentication (voice, face, wathever) wasn't successful.
+    * Wakeword double check wasn't succesful.
+    * Two or more clients were activated by the same user at the same time and another got the focus.
+    * Too many clients
 
 *POST* **Server/vap/clientRegistry/sessionData** (Confirmable: Optional, Client -> Registry)
 * capabilities: [] ->
@@ -87,15 +61,12 @@ This signals that a client wants to start a session. At this point we can send c
 
 **Answer**
 * Ok (Code: 231 Continue)
-* If last fragment:
-    * Ok (Code: 201 Created) #!TODO#! Should we allow for cacheable responses with 205 for those that the skill said it was cacheable?
-    * #!TODO#! Should we wait for the answer from the whole pipeline? Or rather send a "everything alright we are processing"? Note: An everything alright we are processing seems interesting from the viewpoint of a device that wants to show the user that there's processing being done.
-
-Final answer:
-* capabilities: [] ->
-    * name: String
-    * <capability data>
-* endSession: bool
+* If last fragment: (Note: It may take a while)
+    * Ok (Code: 201 Created)
+    * capabilities: [] ->
+        * name: String
+        * <capability data>
+    * endSession: bool
 
 ## On Anytime
 
@@ -104,8 +75,6 @@ Final answer:
     * name: String
     * from: String -> Skill name, can also be the system itself.
     * <capability data>
-
-#!TODO#! Does this need an answer? An alternative could be to propose having it as confirmable.
 
 ## When closing
 
@@ -120,6 +89,6 @@ Final answer:
             * code: int -> 400
             * type: "wrong clientId"
             * object: String -> The clientId that didn't exist
-        * 401 Unauthorized: This clientId is not related to this address #!TODO#! Should this be emptier to make DDOS attacks more difficult?
+        * 401 Unauthorized: This clientId is not related to this address
             * code: int -> 401
             * type: "unauthorized"
