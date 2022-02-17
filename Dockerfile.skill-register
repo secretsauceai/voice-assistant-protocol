@@ -1,0 +1,73 @@
+# Do the build in a rust image (we'll move the binaries later)
+FROM rust:1.58 as builder
+
+# Dependencies and folders
+#RUN USER=root apt-get update && apt-get -y install libssl-dev libpocketsphinx-dev libsphinxbase-dev clang
+RUN mkdir build
+WORKDIR ./build
+
+# With Rust in Docker the best way to proceed is to first build the dependencies
+# (by setting up dummy projects) and then build the actual project.
+
+# First, populate workspace with dummies
+RUN USER=root \
+    cargo new --bin vap-client-register && \
+    cargo new --lib vap-common && \
+    cargo new --lib vap-common-client && \
+    cargo new --lib vap-common-skill && \
+    cargo new --bin vap-skill-register
+
+# Copy all project files
+COPY ./vap-client-register/Cargo.toml ./vap-client-register/Cargo.toml
+COPY ./vap-common/Cargo.toml ./vap-common/Cargo.toml
+COPY ./vap-common-client/Cargo.toml ./vap-common-client/Cargo.toml
+COPY ./vap-common-skill/Cargo.toml ./vap-common-skill/Cargo.toml
+COPY ./vap-skill-register/Cargo.toml ./vap-skill-register/Cargo.toml
+COPY ./Cargo.toml ./Cargo.toml
+
+# Build the dependencies
+RUN cargo build --release --package=vap-skill-register
+
+# Actual build
+## Delete dummy sources
+RUN rm \
+    ./vap-client-register/src/*.rs \
+    ./vap-common/src/*.rs \
+    ./vap-common-client/src/*.rs \
+    ./vap-common-skill/src/*.rs \
+    ./vap-skill-register/src/*.rs
+# Copy sources and build again
+COPY . ./
+RUN \
+    rm ./target/release/deps/vap_skill_register* && \
+    cargo build --release --package=vap-skill-register
+
+# Move to final image and configure it
+FROM debian:bullseye-slim
+ARG APP=/usr/src/app
+
+#RUN apt-get update \
+#    && apt-get install -y libssl libpocketsphinx libsphinxbase \
+#    && rm -rf /var/lib/apt/lists/*
+
+# CoAP Port
+EXPOSE 5683
+
+ENV TZ=Etc/UTC \
+    APP_USER=appuser
+
+RUN groupadd $APP_USER \
+    && useradd -g $APP_USER $APP_USER \
+    && mkdir -p ${APP}
+
+# Copy binary
+COPY --from=builder \
+    /build/target/release/vap-skill-register \
+    ${APP}/vap-skill-register
+
+RUN chown -R $APP_USER:$APP_USER ${APP}
+
+USER $APP_USER
+WORKDIR ${APP}
+
+CMD ["./vap-skill-register"]

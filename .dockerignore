@@ -1,0 +1,12 @@
+# Binaries
+target
+
+# Non code
+benchmarks
+protocol
+vap-python-skill
+
+# Config folders
+.*
+
+
