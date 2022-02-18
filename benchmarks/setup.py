@@ -11,6 +11,14 @@ setup(name="protocol-benchmark",
         'matplotlib',
         'memory_profiler',
         'psutil',
+
+        'cycler',                     # Needed by matplotlib
+        'kiwisolver',                 # Needed by matplotlib
+        'numpy',                      # Needed by matplotlib
+        'packaging',                  # Needed by matplotlib
+        'pillow',                     # Needed by matplotlib
+        'pyparsing',                  # Needed by matplotlib
+        'python-dateutil',            # Needed by matplotlib
         
 
         # Protocols
@@ -21,10 +29,12 @@ setup(name="protocol-benchmark",
         'msgpack',                    # For MessagePack messages
         'flatbuffers',                # For FlexBuffers messages
         'mapbuffer',                  # For MapBuf messages
+
         'brotli',                     # Dependency of mapbuffer
+        'crc32c',                     # Dependency of mapbuffer
         'deflate',                    # Dependency of mapbuffer
-        'zstandard',                  # Dependency of mapbuffer
         'tqdm',                       # Dependency of mapbuffer
+        'zstandard',                  # Dependency of mapbuffer
 
         'rhasspy-hermes',             # For Hermes protocol
 
@@ -32,8 +42,14 @@ setup(name="protocol-benchmark",
         'hivemind_bus_client',
         'mycroft_messagebus_client',  # For Hivemind and Mycroft communication
 
-        'kthread',                    # Dependency of hivemind
         'inflection',                 # Dependency of hivemind
         'json-database',              # Dependency of hivemind
+        'kthread',                    # Dependency of hivemind
+        'pexpect',                    # Dependency of hivemind
+        'requests',                   # Dependency of hivemind
+
+        'filelock',                   # Dependency of json-database
+        'memory_tempfile',            # Dependency of json-database
+        
         
     ])
