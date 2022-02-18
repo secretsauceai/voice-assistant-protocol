@@ -4,7 +4,7 @@ FROM rust:1.58 as builder
 # Dependencies and folders
 #RUN USER=root apt-get update && apt-get -y install libssl-dev libpocketsphinx-dev libsphinxbase-dev clang
 RUN mkdir build
-WORKDIR ./build
+WORKDIR /build
 
 # With Rust in Docker the best way to proceed is to first build the dependencies
 # (by setting up dummy projects) and then build the actual project.
