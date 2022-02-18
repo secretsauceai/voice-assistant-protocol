@@ -5,14 +5,19 @@ import functools
 from pathlib import Path
 import statistics
 import timeit
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, cast, Dict, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import memory_profiler
 
 class Kernel:
+    Callback = Union[Callable[[Any], Any], Callable[[], Any]]
     """A kernel to be called later"""
-    def __init__(self, setup: Callable, func:Callable, name: str):
+    def __init__(self, 
+        setup: Callable[[], Any],
+        func: Callback,
+        name: str):
+
         self.setup = setup
         self.func = func
         self.name = name
@@ -104,16 +109,16 @@ def run():
     def time_kernel(kernel: Kernel) -> float:
         init_data = kernel.setup()
         if init_data is not None:
-            fun = functools.partial(kernel.func,init_data)
+            fun: Callable[[], Any] = functools.partial(kernel.func,init_data)
         else:
-            fun = kernel.func
+            fun = cast(Callable[[], Any], kernel.func)
 
         return timeit.timeit(fun, number=1)
 
     def mem_of_kernel(kernel: Kernel) -> float:
         init_data = kernel.setup()
         if init_data is not None:
-            tuple_call = (kernel.func, [kernel.setup()], {})            
+            tuple_call: Tuple[Kernel.Callback, List[Callable[[], Any]], Dict] = (kernel.func, [kernel.setup()], {})            
         else:
             tuple_call = (kernel.func, [], {})
 
@@ -194,7 +199,7 @@ if __name__ == "__main__":
         print("Hello world")
     
     @benchmark
-    def test_hello():
+    def test_hello2():
         print("Hello default")
 
     @benchmark
