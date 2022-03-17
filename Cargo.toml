@@ -1,4 +1,10 @@
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
-members = ["vap-common","vap-client-register", "vap-skill-register"]
+members = [
+    "vap-common",
+    "vap-client-register",
+    "vap-client-register-demo",
+    "vap-skill-register",
+    "vap-skill-register-demo"
+]

@@ -730,6 +730,13 @@ name = "vap-client-register"
 version = "0.1.0"
 
 [[package]]
+name = "vap-client-register-demo"
+version = "0.1.0"
+dependencies = [
+ "vap-client-register",
+]
+
+[[package]]
 name = "vap-common"
 version = "0.1.0"
 
@@ -755,6 +762,15 @@ dependencies = [
  "thiserror",
  "tokio",
  "vap-common-skill",
+]
+
+[[package]]
+name = "vap-skill-register-demo"
+version = "0.1.0"
+dependencies = [
+ "coap-lite",
+ "tokio",
+ "vap-skill-register",
 ]
 
 [[package]]

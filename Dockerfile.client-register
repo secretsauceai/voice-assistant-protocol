@@ -11,37 +11,44 @@ WORKDIR /build
 
 # First, populate workspace with dummies
 RUN USER=root \
-    cargo new --bin vap-client-register && \
+    cargo new --lib vap-client-register && \
+    cargo new --bin vap-client-register-demo && \
     cargo new --lib vap-common && \
     cargo new --lib vap-common-client && \
     cargo new --lib vap-common-skill && \
-    cargo new --bin vap-skill-register
+    cargo new --lib vap-skill-register && \
+    cargo new --bin vap-skill-register-demo
 
 # Copy all project files
 COPY ./vap-client-register/Cargo.toml ./vap-client-register/Cargo.toml
+COPY ./vap-client-register-demo/Cargo.toml ./vap-client-register-demo/Cargo.toml
 COPY ./vap-common/Cargo.toml ./vap-common/Cargo.toml
 COPY ./vap-common-client/Cargo.toml ./vap-common-client/Cargo.toml
 COPY ./vap-common-skill/Cargo.toml ./vap-common-skill/Cargo.toml
 COPY ./vap-skill-register/Cargo.toml ./vap-skill-register/Cargo.toml
+COPY ./vap-skill-register-demo/Cargo.toml ./vap-skill-register-demo/Cargo.toml
 COPY ./Cargo.toml ./Cargo.toml
 
 # Build the dependencies
-RUN cargo build --release --package=vap-client-register
+RUN cargo build --release --package=vap-client-register-demo
 
 # Actual build
 ## Delete dummy sources
 RUN rm \
     ./vap-client-register/src/*.rs \
+    ./vap-client-register-demo/src/*.rs \
     ./vap-common/src/*.rs \
     ./vap-common-client/src/*.rs \
     ./vap-common-skill/src/*.rs \
-    ./vap-skill-register/src/*.rs
+    ./vap-skill-register/src/*.rs \
+    ./vap-skill-register-demo/src/*.rs
+
 # Copy sources and build again
 COPY . ./
 
 RUN \
-    rm ./target/release/deps/vap_client_register* && \
-    cargo build --release --package=vap-client-register
+    rm ./target/release/deps/vap_client_register_demo* && \
+    cargo build --release --package=vap-client-register-demo
 
 # Move to final image and configure it
 FROM debian:bullseye-slim
@@ -63,12 +70,12 @@ RUN groupadd $APP_USER \
 
 # Copy binary and runtime dependencies
 COPY --from=builder \
-    /build/target/release/vap-client-register \
-    ${APP}/vap-client-register
+    /build/target/release/vap-client-register-demo \
+    ${APP}/vap-client-register-demo
 
 RUN chown -R $APP_USER:$APP_USER ${APP}
 
 USER $APP_USER
 WORKDIR ${APP}
 
-CMD ["./vap-client-register"]
+CMD ["./vap-client-register-demo"]
