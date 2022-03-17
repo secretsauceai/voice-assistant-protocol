@@ -35,7 +35,7 @@ def benchmark(_func=None, *, name: Optional[str]= None, collection:Optional[str]
 
     Note: Generally this makes just one execution to be grouped in a collection,
         however, declaring "with_classes" makes it like a collection of
-        benchmarks each one called with a different class.
+        executions (a benchmark in itself) each one called with a different class.
 
     keyword arguments:
     name -- The name of this run of benchmark. Ignored if with_classes is not empty.
