@@ -125,9 +125,13 @@ def run():
         return max(memory_profiler.memory_usage(tuple_call))
         
 
-    for name, benchmark in collections.items():            
-                
-        times = map(lambda kernel: ([time_kernel(kernel) for _ in range(repeat)],kernel.name, mem_of_kernel(kernel)), benchmark.kernels)
+    for name, benchmark in collections.items():
+        print(f"Running benchmark {name}")
+        def run_kernel(kernel: Kernel):
+            print(f"Running kernel {kernel.name}")
+            return ([time_kernel(kernel) for _ in range(repeat)], kernel.name, mem_of_kernel(kernel))
+
+        times = map(run_kernel, benchmark.kernels)
         chart_vals = list(map(lambda args: (min(args[0]), statistics.stdev(args[0]), args[1], args[2]), times))
         chart_lists = list(map(list, zip(*chart_vals)))
         max_val = max(map(lambda args: args[0] + args[1], chart_vals))

@@ -16,12 +16,17 @@ class MirrorResource(resource.Resource):
         print('PUT payload: %s' % request.payload)
         self.set_content(request.payload)
         return aiocoap.Message(code=aiocoap.CHANGED, payload=self.content)
+    
+    async def render_post(self, request):
+        print('POST payload: %s' % request.payload)
+        self.set_content(request.payload)
+        return aiocoap.Message(code=aiocoap.CHANGED, payload=self.content)
 
 # logging setup
 
-logging.basicConfig(level=logging.INFO)
-logging.getLogger("coap-server").setLevel(logging.DEBUG)
-
+logging.basicConfig(level=logging.ERROR)
+logging.getLogger("coap-server").setLevel(logging.ERROR)
+logging.disable()
 async def main():
     # Resource tree creation
     root = resource.Site()

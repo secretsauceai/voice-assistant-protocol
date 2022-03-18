@@ -1,6 +1,6 @@
-from ast import Call
 from typing import Any, Callable, Dict, Protocol, Union
 import asyncio
+import logging
 
 # Transport protocols
 import aiocoap
@@ -16,16 +16,19 @@ from mapbuffer import MapBuffer
 import mycroft_bus_client as mycroft
 
 
-MQTT_SERVER_IP = ""
+MQTT_SERVER_IP = "127.0.01"
 MQTT_SEVER_PORT = 1883
 
-MQTTSN_SERVER_IP = ""
+MQTTSN_SERVER_IP = bytes("127.0.0.1",'utf-8')
 MQTTSN_SERVER_PORT = 1883
 
-COAP_SERVER_IP = ""
+COAP_SERVER_IP = "127.0.0.1"
 COAP_SERVER_PORT = 5683
 
 SendData = Union[Dict[str, Any],  bytes]
+logging.getLogger("coap-server").setLevel(logging.ERROR)
+logging.disable()
+
 
 def encapsulate_bin(data: SendData, f: Callable[[Dict[str, Any]], bytes]) -> bytes:
     if isinstance(data, dict):
@@ -47,7 +50,7 @@ class MqttBase(VaProto):
         self.client.connect(MQTT_SERVER_IP, MQTT_SEVER_PORT)
     
     def send_message(self, path: str, dest: str, data: SendData):
-        msg = self.client.publish(path + "/" + dest, paylooad=self.transform_payload(data))
+        msg = self.client.publish(path + "/" + dest, payload=self.transform_payload(data))
         msg.wait_for_publish()
 
     def transform_payload(self, data: SendData) -> bytes:
@@ -58,7 +61,7 @@ class MqttSnBase(VaProto):
     """Base class for MQTT-SN-based protocols. Not to be used directly"""
 
     def __init__(self):
-        self.client = mqttsn.client.Client(MQTTSN_SERVER_IP, MQTTSN_SERVER_PORT)
+        self.client = mqttsn.client.Client(MQTTSN_SERVER_IP, port=MQTTSN_SERVER_PORT)
         self.client.connect()
 
     def send_message(self, path: str, dest: str, data: SendData):
@@ -74,52 +77,75 @@ class CoApBase(VaProto):
         self.client = asyncio.get_event_loop().run_until_complete(aiocoap.Context.create_client_context())
     
     def send_message(self, path: str, dest: str, data: SendData):
-        request = aiocoap.Message(code=aiocoap.POST, uri=COAP_SERVER_IP + '/' + path, payload=self.transform_payload(data))
-        asyncio.get_event_loop().run_until_complete(self.client.request(request))    
+        request = aiocoap.Message(code=aiocoap.POST, uri='coap://' + COAP_SERVER_IP + '/' + path, payload=self.transform_payload(data))
+        asyncio.get_event_loop().run_until_complete(self.client.request(request).response)
     
     def transform_payload(self, data: SendData) -> bytes:
         raise NotImplementedError()
 
+# Message formats
+class FlexBufFormat:
+    @staticmethod
+    def transform_payload(data: SendData) -> bytes:
+        return encapsulate_bin(data, lambda d: flexbuffers.Dumps(d))
+
+class MapBufferFormat:
+    @staticmethod
+    def transform_payload(data: SendData) -> bytes:
+        def indexKeys(d: Dict[str, Any]) -> Dict[int, Any]:
+            def mapToInt(k: str) -> int:
+                return {
+                    "voice": 0,
+                }[k]
+
+            return {mapToInt(k): v for k, v in d.items()}
+
+        return encapsulate_bin(data, lambda d: MapBuffer(indexKeys(d)).tobytes())
+
+class MsgPackFormat:
+    @staticmethod
+    def transform_payload(data: SendData) -> bytes:
+        return encapsulate_bin(data, lambda d: msgpack.packb(d))
 # Protocols themselves
 
 ## MQTT
 class MqttFlexbuf(MqttBase):
     def transform_payload(self, data: SendData) -> bytes:
-        return encapsulate_bin(data, lambda d: flexbuffers.Dump(d))
+        return FlexBufFormat.transform_payload(data)
 
-class MqttMapBuf(MqttBase):
+class MqttMapBuffer(MqttBase):
     def transform_payload(self, data: SendData) -> bytes:
-        return encapsulate_bin(data, lambda d: MapBuffer(d).tobytes())
+        return MapBufferFormat.transform_payload(data)
 
 class MqttMessagePack(MqttBase):
     def transform_payload(self, data: SendData) -> bytes:
-        return encapsulate_bin(data, lambda d: msgpack.packb(d))
+        return MsgPackFormat.transform_payload(data)
 
 ## MQTT-SN
 class MqttSnFlexbuf(MqttSnBase):
     def transform_payload(self, data: SendData) -> bytes: 
-        return encapsulate_bin(data, lambda d: flexbuffers.Dumps(data))
+        return FlexBufFormat.transform_payload(data)
 
-class MqttSnMapBuf(MqttSnBase):
+class MqttSnMapBuffer(MqttSnBase):
     def transform_payload(self, data: SendData) -> bytes:
-        return encapsulate_bin(data, lambda d: MapBuffer(d).tobytes())
+        return MapBufferFormat.transform_payload(data)
 
 class MqttSnMessagePack(MqttSnBase):
     def transform_payload(self, data: SendData) -> bytes:
-        return encapsulate_bin(data, lambda d: msgpack.packb(d))
+        return MsgPackFormat.transform_payload(data)
 
 ## CoAP
-class CoApFlexbuf(VaProto):
+class CoApFlexbuf(CoApBase):
     def transform_payload(self, data: SendData) -> bytes:
-        return encapsulate_bin(data, lambda d: flexbuffers.Dump(d))
+        return FlexBufFormat.transform_payload(data)
 
-class CoApMapBuf(VaProto):
+class CoApMapBuffer(CoApBase):
     def transform_payload(self, data: SendData) -> bytes:
-        return encapsulate_bin(data, lambda d: MapBuffer(d).tobytes())
+        return MapBufferFormat.transform_payload(data)
 
-class CoApMessagePack(VaProto):
+class CoApMessagePack(CoApBase):
     def transform_payload(self, data: SendData) -> bytes:
-        return encapsulate_bin(data, lambda d: msgpack.packb(d))
+        return MsgPackFormat.transform_payload(data)
 
 ## Others
 class Hermes(VaProto):
@@ -131,7 +157,7 @@ class Hermes(VaProto):
         self.client.connect(MQTT_SERVER_IP, MQTT_SEVER_PORT)
 
     def send_message(self, path: str, dest: str, data: SendData):
-        msg = self.client.publish(self.transform_dest(path, dest), paylooad=self.transform_payload(data))
+        msg = self.client.publish(self.transform_dest(path, dest), payload=self.transform_payload(data))
         msg.wait_for_publish()
 
     @staticmethod
@@ -141,7 +167,7 @@ class Hermes(VaProto):
                 return f(data)
             return data
 
-        return json.dumps(data).encode()
+        return binary_or(data, lambda d: json.dumps(d).encode())
     
     @staticmethod
     def transform_dest(path:str, dest: str) -> str:
@@ -161,6 +187,7 @@ class HiveMind(VaProto):
         crypto_key = "ivf1NQSkQNogWYyr"
 
         self.client = HiveMessageBusClient(key, crypto_key=crypto_key, ssl=False)
+        self.client.run_forever()
 
     def send_message(self, path: str, dest: str, data: SendData):
         mycroft_msg = mycroft.Message(dest, data)
@@ -168,8 +195,8 @@ class HiveMind(VaProto):
 
 
 all_protos = [
-    MqttFlexbuf, MqttMapBuf, MqttMessagePack,
-    MqttSnFlexbuf, MqttSnMapBuf, MqttSnMessagePack, 
-    CoApFlexbuf, CoApMapBuf, CoApMessagePack,
-    Hermes, HiveMind
+    MqttFlexbuf, MqttMapBuffer, MqttMessagePack,
+    #MqttSnFlexbuf, MqttSnMapBuffer, MqttSnMessagePack, 
+    CoApFlexbuf, CoApMapBuffer, CoApMessagePack,
+    Hermes#, HiveMind
 ]
