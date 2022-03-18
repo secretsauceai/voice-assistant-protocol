@@ -55,9 +55,7 @@ reorder 25% 50%
 
 # We'll consider that mosquitto MQTT is up and running
 python3 "$SCRIPT_PATH/dummy_server.py" & \
-#"$SCRIPT_PATH/paho.mqtt-sn.embedded-c/MQTTSNGateway/bin/MQTT-SNGateway" -f "$SCRIPT_PATH/MQTTSN.conf" &     print("Hellloooo")
-    import time
-    time.sleep(60)\
+"$SCRIPT_PATH/paho.mqtt-sn.embedded-c/MQTTSNGateway/bin/MQTT-SNGateway" -f "$SCRIPT_PATH/MQTTSN.conf" & \
 python3 "$SCRIPT_PATH/main.py"
 
 sudo tc qdisc del dev $INTERFACE root
