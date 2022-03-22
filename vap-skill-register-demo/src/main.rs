@@ -1,5 +1,4 @@
-use vap_skill_register::{SkillRegister, SkillRegisterMessage, Response};
-use coap_lite::{ResponseType};
+use vap_skill_register::{SkillRegister, SkillRegisterMessage, Response, ResponseType};
 
 mod conf {
     pub const PORT: u16 = 5683;

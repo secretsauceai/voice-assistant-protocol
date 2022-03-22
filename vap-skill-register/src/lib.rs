@@ -2,7 +2,7 @@ use std::future::Future;
 use std::io::Cursor;
 use std::net::SocketAddr;
 
-use coap_lite::{RequestType as Method, CoapRequest, CoapResponse, ResponseType};
+use coap_lite::{RequestType as Method, CoapRequest, CoapResponse};
 use coap::{CoAPClient, Server};
 use futures::{channel::{mpsc, oneshot}, StreamExt, SinkExt};
 use libmdns::{Responder, Service};
@@ -10,6 +10,8 @@ use rmp_serde::from_read;
 use serde::de::DeserializeOwned;
 use thiserror::Error;
 use vap_common_skill::structures::*;
+
+pub use coap_lite::ResponseType;
 
 #[derive(Debug, Error)]
 pub enum Error {
