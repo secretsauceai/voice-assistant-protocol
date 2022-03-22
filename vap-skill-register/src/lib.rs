@@ -1,4 +1,3 @@
-use std::future::Future;
 use std::io::Cursor;
 use std::net::SocketAddr;
 
@@ -63,7 +62,7 @@ impl SkillRegister {
         ))
     }
 
-    pub async fn run(&self) -> Result<(), Error>  {
+    pub async fn run(self) -> Result<(), Error>  {
         let _zeroconf = ZeroconfService::new(&self.name, self.port)?;
 
         async fn perform(request: CoapRequest<SocketAddr>, mut in_send: mpsc::Sender<(SkillRegisterMessage, oneshot::Sender<Response>)>) -> Option<CoapResponse> {
@@ -216,16 +215,6 @@ pub struct SkillRegisterStream {
 impl SkillRegisterStream {
     pub async fn recv(&mut self) -> Result<(SkillRegisterMessage, oneshot::Sender<Response>), Error> {
         Ok(self.stream_in.next().await.unwrap())
-    }
-
-    pub async fn read_incoming<F, Fut>(mut self, cb: F) -> Result<(), Error>
-    where
-    F: Fn(SkillRegisterMessage) -> Fut,
-    Fut: Future<Output = Response> {
-        loop {
-            let (msg, sender) = self.recv().await.unwrap();
-            sender.send(cb(msg).await).map_err(|_|Error::ClosedChannel)?;
-        }
     }
 }
 
