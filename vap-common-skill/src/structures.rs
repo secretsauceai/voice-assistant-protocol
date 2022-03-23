@@ -27,6 +27,50 @@ pub struct MsgConnectResponse {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgRegisterIntents {
+    #[serde(rename="nluData")]
+    pub nlu_data: msg_register_intents::NluData
+}
+
+pub mod msg_register_intents {
+    use super::Language;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct NluData {
+        pub language: Language,
+        pub intents: Vec<NluDataIntent>,
+        pub slots: Vec<NluDataSlot>,
+        pub entities: Vec<NluDataEntity>,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct NluDataIntent {
+        pub name: String,
+        pub utterances: Vec<NluDataIntentUtterance>
+    }
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct NluDataIntentUtterance {
+        pub text: String
+    }
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct NluDataSlot {
+        pub name: String,
+        pub entity: String
+    }
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct NluDataEntity {
+        pub strict: bool,
+        pub data: Vec<NluDataEntityData>
+    }
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct NluDataEntityData {
+        pub value: String,
+        pub synonyms: Vec<String>
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

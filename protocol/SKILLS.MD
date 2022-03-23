@@ -59,9 +59,10 @@ After that send:
         * utterances: [] ->
             * text: String
         * slots:  [] ->
+            * name: String
             * entity: String -> Name of entity.
             * required: bool -> If true the assistant must ask for it beforehand.
-            * prompt: Optional\<String> -> If required and not present the slot will be asked .with this.
+            * prompt: Optional\<String> -> If required and not present the slot will be asked with this.
             * reprompt: Optional\<String> -> If prompt failed try with this one.
     * entities: [] ->
         * strict: bool (default: false) -> If true only the words in the list will be accepted
