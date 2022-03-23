@@ -58,13 +58,45 @@ pub struct MsgSkillCanAnswerResponse {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct MsgSkillAnswer {
-    // pub isfinal
-    // pub capabilities
+pub struct MsgSkillRequest {
+    pub client: msg_skill_request::ClientData,
+    pub request: msg_skill_request::RequestData,
+}
+
+pub mod msg_skill_request {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct ClientData {
+        #[serde(rename="systemId")]
+        pub system_id: String,
+        pub capabilities: Vec<ClientDataCapability>,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct ClientDataCapability {
+        pub name: String,
+        pub version: u16,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct RequestData {
+        #[serde(rename="type")]
+        pub type_: String,
+        pub intent: String,
+        pub locale: String,
+        pub slots: Vec<RequestSlot>,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct RequestSlot {
+        pub name: String,
+        pub value: Option<String>,
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct MsgSkillAnswerResponse {
+pub struct MsgSkillRequestResponse {
     // pub isfinal
     // pub capabilities
 }

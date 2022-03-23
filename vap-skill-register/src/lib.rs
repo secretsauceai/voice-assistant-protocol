@@ -199,7 +199,7 @@ impl SkillRegister {
         answers
     }
 
-    pub async fn activate_skill(&mut self, ip: String, msg: MsgSkillAnswer) -> Result<MsgSkillAnswerResponse, Error> {
+    pub async fn activate_skill(&mut self, ip: String, msg: MsgSkillRequest) -> Result<MsgSkillRequestResponse, Error> {
         let c = CoAPClient::new(ip).unwrap();
         let data = rmp_serde::to_vec(&msg).unwrap();
         let resp = c.request_path("vap/canYouAnswer", Method::Get, Some(data), None).unwrap();
