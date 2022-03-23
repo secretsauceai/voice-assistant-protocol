@@ -39,14 +39,14 @@ pub mod msg_register_intents {
     pub struct NluData {
         pub language: Language,
         pub intents: Vec<NluDataIntent>,
-        pub slots: Vec<NluDataSlot>,
         pub entities: Vec<NluDataEntity>,
     }
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
     pub struct NluDataIntent {
         pub name: String,
-        pub utterances: Vec<NluDataIntentUtterance>
+        pub utterances: Vec<NluDataIntentUtterance>,
+        pub slots: Vec<NluDataSlot>
     }
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -141,8 +141,17 @@ pub mod msg_skill_request {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgSkillRequestResponse {
-    // pub isfinal
-    // pub capabilities
+    pub capabilities: Vec<msg_skill_request_response::Capability>,
+}
+
+mod msg_skill_request_response {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct Capability {
+        pub name: String,
+        pub data: String, // TODO: This should be a mapping
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
