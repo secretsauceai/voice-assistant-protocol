@@ -28,7 +28,7 @@ pub struct MsgConnectResponse {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgRegisterIntents {
     #[serde(rename="nluData")]
-    pub nlu_data: msg_register_intents::NluData
+    pub nlu_data: Vec<msg_register_intents::NluData>
 }
 
 pub mod msg_register_intents {
