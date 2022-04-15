@@ -8,3 +8,5 @@ edition = "2021"
 [dependencies]
 vap-skill-register = {path="../vap-skill-register"}
 tokio = {version = "^1.15", features = ["macros", "rt", "time"] }
+rmp = "^0.8"
+rmp-serde = "^0.15"

@@ -10,6 +10,7 @@ use thiserror::Error;
 use vap_common_skill::structures::*;
 
 pub use coap_lite::ResponseType;
+pub use vap_common_skill::structures as structures;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -70,6 +71,7 @@ impl SkillRegister {
                     }
                     Err(e) => {
                         Err(r.map(|mut r|{
+                            println!("{}", &e);
                             let status = match e {
                                 rmp_serde::decode::Error::TypeMismatch(_) => {
                                     coap_lite::ResponseType::RequestEntityIncomplete
@@ -103,7 +105,7 @@ impl SkillRegister {
                             Ok(resp_data) => {
                                 resp.map(|mut r|{
                                     r.set_status(resp_data.status);
-                                    r.message = coap_lite::Packet::from_bytes(&resp_data.payload).unwrap();
+                                    r.message.payload = resp_data.payload;
                                     r
                                 })
                             }

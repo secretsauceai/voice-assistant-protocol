@@ -79,11 +79,12 @@ class VapClient():
         payload = {
             "name": "My test skill",
             "id": "com.example.test",
+            "vapVersion": "1.0.0",
             "uniqueAuthenticationToken": "",
         }
 
         # Create message
-        request = aiocoap.Message(code=aiocoap.GET, payload=msgpack.packb(payload), uri=f'coap://{registry_address}/vap/skillRegistry/connect')
+        request = aiocoap.Message(code=aiocoap.POST, payload=msgpack.packb(payload), uri=f'coap://{registry_address}/vap/skillRegistry/connect')
 
         # Send it to the registry and wait for a response
         response = await self.client.request(request).response
@@ -93,7 +94,19 @@ class VapClient():
             raise Exception(f"Failed to register skill: {response.code}")
         
         resp_payload = msgpack.unpackb(response.payload)
-        print(f"Languages available: {','.join(resp_payload['languages'])}")
+        langs_id = 0
+        def lang_to_str(lang):
+            if not lang[0] is None:
+                first_phase = f'{lang[1]}-{lang[0]}'
+            else:
+                first_phase = lang[1]
+            
+            if not lang[2] is None:
+                return f'{first_phase}-{lang[2]}'
+            else:
+                return first_phase
+
+        print(f"Languages available: {','.join( [lang_to_str(x) for x in resp_payload[langs_id]])}")
 
     async def registerIntents(self):
         # Send our utterances to the server for them to be taken account of
@@ -101,34 +114,46 @@ class VapClient():
         payload = {
             "nluData": [
                 {
-                    "language": "en-US",
+                    "language": {
+                        "language": "en",
+                        "country": "us",
+                        "extra": None
+                    },
                     "intents": [
                         {
                             "name": "hello",
                             "utterances": [
-                                {"text":"hello there"},
-                                {"text":"hi"},
-                            ]
+                                {"text": "hello there"},
+                                {"text": "hi"},
+                            ],
+                            "slots": []
                         }
-                    ]
+                    ],
+                    "entities": []
                 },
                 {
-                    "language": "es-es",
+                    "language": {
+                        "language": "en",
+                        "country": "es",
+                        "extra": None
+                    },
                     "intents": [
                         {
                             "name": "hello",
                             "utterances": [
-                                {"text":"hola, soy dora!"},
-                                {"text":"hola"}
-                            ]
+                                {"text": "hola, soy dora!"},
+                                {"text": "hola"}
+                            ],
+                            "slots": []
                         }
-                    ]
+                    ],
+                    "entities": []
                 }
             ]
         }
         
         # Create message
-        request = aiocoap.Message(code=aiocoap.GET, payload=msgpack.packb(payload), uri=f'coap://{registry_address}/vap/skillRegistry/registerIntents')
+        request = aiocoap.Message(code=aiocoap.POST, payload=msgpack.packb(payload), uri=f'coap://{registry_address}/vap/skillRegistry/registerIntents')
 
         response = await self.client.request(request).response
 
@@ -166,7 +191,7 @@ class VapClient():
         request = aiocoap.Message(code=aiocoap.GET, payload=msgpack.packb(payload), uri=f'coap://{registry_address}/vap/skillRegistry/notification')
 
         # Send request
-        await self.client.request(request)
+        await self.client.request(request).response
 
     async def query(self):
         # Ask something to the system about a certain client or about the system itself.
@@ -193,7 +218,7 @@ class VapClient():
         # We find it by applying a filter
         cap_color = list(filter(
             lambda c: c["name"]=="preferences",
-            msgpack.unpackb(response)["data"][0]["capabilities"]))
+            msgpack.unpackb(response.payload)["data"][0]["capabilities"]))
 
         # Now that we have a list, get the first item and return the color that
         # we asked for
