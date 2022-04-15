@@ -96,6 +96,7 @@ class MapBufferFormat:
             def mapToInt(k: str) -> int:
                 return {
                     "voice": 0,
+                    "input": 1,
                 }[k]
 
             return {mapToInt(k): v for k, v in d.items()}
