@@ -4,7 +4,6 @@ use std::net::SocketAddr;
 use coap_lite::{RequestType as Method, CoapRequest, CoapResponse};
 use coap::{CoAPClient, Server};
 use futures::{channel::{mpsc, oneshot}, StreamExt, SinkExt};
-use libmdns::{Responder, Service};
 use rmp_serde::from_read;
 use serde::de::DeserializeOwned;
 use thiserror::Error;
@@ -63,8 +62,6 @@ impl SkillRegister {
     }
 
     pub async fn run(self) -> Result<(), Error>  {
-        let _zeroconf = ZeroconfService::new(&self.name, self.port)?;
-
         async fn perform(request: CoapRequest<SocketAddr>, mut in_send: mpsc::Sender<(SkillRegisterMessage, oneshot::Sender<Response>)>) -> Option<CoapResponse> {
             fn read_payload<T: DeserializeOwned>(payload: &[u8], r: Option<CoapResponse>) -> Result<(T, Option<CoapResponse>), Option<CoapResponse>> {
                 match from_read(Cursor::new(payload)) {
@@ -129,7 +126,25 @@ impl SkillRegister {
                             handle_msg(request, &mut in_send, |p|{SkillRegisterMessage::Query(p)}).await
                         }
 
-                        _ => response_not_found(request.response)
+                        ".well-known/core" => {
+                            request.response.map(|mut r|{
+                                r.set_status(coap_lite::ResponseType::Content);
+                                r.message.payload = b"</vap>;rt=\"vap-skill-registry\"".to_vec();
+                                r
+                            })
+                        }
+
+                        _ => {
+                            if request.get_path().starts_with("vap/request/") {
+                                // TODO: Make sure only the same skill is asking for it.
+                                request.response.map(|mut r|{
+                                    r.set_status(coap_lite::ResponseType::Valid);
+                                    r
+                                })
+                            } else {
+                                response_not_found(request.response)
+                            }
+                        }
                     }
                 }
 
@@ -154,6 +169,13 @@ impl SkillRegister {
                         _ => response_not_found(request.response)
                     }                    
                 }
+                Method::Put => {
+                    // Puts are needed so that an observe update is produced
+                    request.response.map(|mut r|{
+                        r.set_status(coap_lite::ResponseType::Valid);
+                        r
+                    })
+                }
 
                 _ => {
                     println!("request by other method");
@@ -166,13 +188,15 @@ impl SkillRegister {
         }
 
         let mut server = Server::new(format!("127.0.0.1:{}", self.port)).unwrap();
-        server.run( |request| {
+        server.enable_all_coap(0);
+        server.run( |request| {    
             perform(request, self.in_send.clone())
         }).await.unwrap();
-        Ok(())   
+        Ok(())
     }
 
     pub fn skills_answerable(&mut self, ips: &[String]) -> Vec<MsgSkillCanAnswerResponse> {
+        // TODO: Move to using observe 
         fn send_msg(ip: &str) -> Result<MsgSkillCanAnswerResponse, Error> {
             let c = CoAPClient::new(ip).unwrap();
             let msg = MsgSkillCanAnswer{};
@@ -199,10 +223,10 @@ impl SkillRegister {
         answers
     }
 
-    pub async fn activate_skill(ip: String, msg: MsgSkillRequest) -> Result<MsgSkillRequestResponse, Error> {
-        let c = CoAPClient::new(ip).unwrap();
+    pub async fn activate_skill(&self, name: String, msg: MsgSkillRequest) -> Result<MsgSkillRequestResponse, Error> {
+        let c = CoAPClient::new(format!("127.0.0.1:{}", self.port)).unwrap();
         let data = rmp_serde::to_vec(&msg).unwrap();
-        let resp = c.request_path("vap/canYouAnswer", Method::Get, Some(data), None).unwrap();
+        let resp = c.request_path(&format!("vap/request/{}", name), Method::Put, Some(data), None).unwrap();
         let resp_data = rmp_serde::from_read(Cursor::new(resp.message.payload)).unwrap();
         Ok(resp_data)
     }
@@ -215,24 +239,5 @@ pub struct SkillRegisterStream {
 impl SkillRegisterStream {
     pub async fn recv(&mut self) -> Result<(SkillRegisterMessage, oneshot::Sender<Response>), Error> {
         Ok(self.stream_in.next().await.unwrap())
-    }
-}
-
-struct ZeroconfService {
-    _responder: Responder,
-    _service: Service,
-}
-
-impl ZeroconfService {
-    fn new(name: &str, port:u16) -> Result<ZeroconfService, Error> {
-        let _responder = Responder::new().map_err(Error::ZeroconfServiceRegistration)?;
-        let _service = _responder.register(
-            "_vap-skill-register._udp".to_owned(), 
-            name.to_owned(),
-            port,
-            &["path=/"]
-        );
-    
-        Ok(ZeroconfService{_responder,_service})
     }
 }

@@ -10,7 +10,7 @@ class MirrorResource(resource.Resource):
     responses, which trigger blockwise transfer."""
 
     async def render_get(self, request):
-        return aiocoap.Message(payload=self.content)
+        return aiocoap.Message(code=aiocoap.CONTENT, payload=b'</test>;rt="test";ct=0')
 
     async def render_put(self, request):
         print('PUT payload: %s' % request.payload)
@@ -35,8 +35,10 @@ async def main():
     root.add_resource(['asis_api', 'voice'], res)
     root.add_resource(['asis_api', 'sound'], res)
     root.add_resource(['asis_api', 'intent', 'request_weather'], res)
+    root.add_resource(['.well-known', 'core'], res)
 
-    await aiocoap.Context.create_server_context(root)
+    await aiocoap.Context.create_server_context(
+        root, multicast=['wlp5s0'])
 
     # Run forever
     await asyncio.get_running_loop().create_future()

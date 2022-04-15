@@ -3,12 +3,16 @@
 # Minimum python 3.6
 
 import asyncio
+import re
+from urllib import response
 
 import aiocoap
 import aiocoap.resource as resource
 import msgpack
 
 registry_address = "127.0.01"
+all_coaps_ip4 = "224.0.1.187"
+coap_host_reg = re.compile(r'^coap:\/\/([1-9.a-zA-Z]+)\/')
 
 def list_caps(payload):
     """Transform a list of capabilities into a string."""
@@ -59,6 +63,15 @@ class VapClient():
             this needs to be called afterwards. """
 
         self.client = await aiocoap.Context.create_client_context()
+
+    async def __find_registry(self) -> str:
+        """ Find a registry using CoAP's discovery """
+        request = aiocoap.Message(code=aiocoap.GET, uri=f'coap://{all_coaps_ip4}/.well-known/core?rt=vap-skill-registry')
+        response = await self.client.request(request).response
+
+        if "vap-skill-registry" in response.payload:
+            m = coap_host_reg.match(response.payload.decode())
+            return request.get_request_uri(m.group(1))
     
     async def init(self):
         # Register whithin the server
@@ -187,6 +200,12 @@ class VapClient():
         color = cap_color[0]["color"]
 
         print(f"Preferred color: {color}")
+
+    async def register(self):
+        skill_id = "test_skill"
+        request = aiocoap.Message(code=aiocoap.GET, uri=f'coap://{registry_address}/vap/request/{skill_id}')
+        
+
     
 client = VapClient()
 
@@ -199,14 +218,6 @@ async def main():
     # Connect to the skill registry and send utterances and 
     await client.init()
     await client.registerIntents()
-
-    # Register the CoAP paths that we can answer
-    root = resource.Site()
-    root.add_resource((['vap','request']), VapRequestResource())
-    root.add_resource((['vap','canYouAnswer']), VapCanYouAnswerResource())
-
-    # Start the server
-    await aiocoap.Context.create_server_context(root)
 
     # Perform notifications and queries, note this can be done whenever
     await client.notification()
