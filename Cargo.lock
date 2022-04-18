@@ -629,6 +629,8 @@ dependencies = [
 name = "vap-skill-register-demo"
 version = "0.1.0"
 dependencies = [
+ "rmp",
+ "rmp-serde",
  "tokio",
  "vap-skill-register",
 ]

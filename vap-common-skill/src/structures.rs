@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -27,6 +29,9 @@ pub struct MsgConnectResponse {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgRegisterIntents {
+    #[serde(rename="skillId")]
+    pub skill_id: String,
+
     #[serde(rename="nluData")]
     pub nlu_data: Vec<msg_register_intents::NluData>
 }
@@ -141,31 +146,84 @@ pub mod msg_skill_request {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgSkillRequestResponse {
-    pub capabilities: Vec<msg_skill_request_response::Capability>,
-}
-
-mod msg_skill_request_response {
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Clone, Debug, Deserialize, Serialize)]
-    pub struct Capability {
-        pub name: String,
-        pub data: String, // TODO: This should be a mapping
-    }
+    pub capabilities: Vec<PlainCapability>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgNotification {
-    //
+    #[serde(rename="skillId")]
+    pub skill_id: String,
+
+    pub data: Vec<msg_notification::Data>
+}
+
+pub mod msg_notification {
+    use serde::{Deserialize, Serialize};
+    
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct Data {
+        #[serde(rename="clientId")]
+        pub client_id: String,
+
+        pub capabilities: Vec<super::PlainCapability>,
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgQuery {
-    //
+    #[serde(rename="skillId")]
+    pub skill_id: String,
+    pub data: Vec<msg_query::QueryData>
+}
+
+mod msg_query {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct QueryData {
+        #[serde(rename="clientId")]
+        pub client_id: String,
+        pub capabilities: Vec<super::PlainCapability>
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct MsgQueryResponse {
+    pub data: Vec<msg_query_response::QueryData>
+}
+
+pub mod msg_query_response {
+    use std::collections::HashMap;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct QueryData {
+        #[serde(rename="clientId")]
+        pub client_id : String,
+        pub capabilities: Vec<QueryDataCapability>,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct QueryDataCapability {
+        pub name: String,
+        pub code: u16,
+
+        #[serde(flatten)]
+        pub data: HashMap<String, String>,
+    }
+
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgSkillClose {
     #[serde(rename="skillId")]
     pub skill_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct PlainCapability {
+    pub name: String,
+
+    #[serde(flatten)]
+    pub cap_data: HashMap<String, String> // TODO: Make this some kind of value thing
 }

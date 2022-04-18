@@ -1,9 +1,9 @@
-# Location
+# Discovery
 
-Skills will search for the skill registry using zeroconf a.k.a bonjour a.k.a mDNS/DNS-SD
+Skills will search for the skill registry using CoAP's service discovery if no
+IP is known.
 
-Name of the Zeroconf service for the Skill Registry "vap-skill-registry.udp"
-
+Name of the CoAP service for the Skill Registry "vap-skill-registry"
 
 # Connection
 
@@ -52,6 +52,7 @@ token has to be resent each time the skill wants to connect to a system.
 
 After that send:
 *POST* **Server/vap/skillRegistry/registerIntents** (Confirmable: Mandatory, Skill -> Registry)
+* skillId: String
 * nluData:[] -> One set per language
     * language: Language
     * intents: [] ->
@@ -81,66 +82,85 @@ After that send:
 
 ## Skill interactions:
 
-*GET* **Skill/vap/canYouAnswer**  (Confirmable: Optional, Registry -> Skill)
-* request:
-    * type: "event"|"intent" -> Internally tagged request data.
-    * capabilities: [] ->
-        * name: String
-        * \<capability data>
+*GET (Obeserve)* **Server/vap/skillRegistry/skills/{skill_system_id}**  (Confirmable: Optional, needs to be observed)
+Either **CanYouAnswer**:
+    * skillId: String
+    * request:
+        * type: "event"|"intent" -> Internally tagged request data.
+        * capabilities: [] ->
+            * name: String
+            * \<capability data>
 
-    * type: "event"
-    * event: String
+        * type: "event"
+        * event: String
 
-    * type: "intent"
-    * intent: String
-    * locale: Language
-    * input: String
-    * slots: [] ->
-        * name: String
-        * value: Optional\<String>
+        * type: "intent"
+        * intent: String
+        * locale: Language
+        * input: String
+        * slots: [] ->
+            * name: String
+            * value: Optional\<String>
 
 The server is asking "Can you answer this request?"
 
-**Answer:** (Code: 205 Content)
-* confidence: float
+    **Answer:** (Code: 205 Content)
+    * confidence: float
 
- When multiple skills are capable of answering the same request (it could be a
- generic request like "turn off the kitchen lights") we send them the intent and the slots (like "turn_off" "kitchen lights") and each skill returns an 
- estimation of how well they can answer this request.
+    When multiple skills are capable of answering the same request (it could be a
+    generic request like "turn off the kitchen lights") we send them the intent and the slots (like "turn_off" "kitchen lights") and each skill returns an 
+    estimation of how well they can answer this request.
 
-*POST* **Skill/vap/request** (Confirmable: Optional, Registry->Skill)
-* client:
-    * systemId: String -> An unique ID for the client to be recognized, it doesn't have to be the same one that the client provides, can be randomly generated.
-    * capabilities: [] ->
-        * name: String
-        * version: int
+Or **request**:
+    * client:
+        * systemId: String -> An unique ID for the client to be recognized, it doesn't have to be the same one that the client provides, can be randomly generated.
+        * capabilities: [] ->
+            * name: String
+            * version: int
 
-* request:
-    * type: "event"|"intent" -> Internally tagged request data.
-    * capabilities: [] -> Extra data sent by the client
+    * request:
+        * type: "event"|"intent" -> Internally tagged request data.
+        * capabilities: [] -> Extra data sent by the client
+            * name: String
+            * <capability data>
+
+        * type: "event"
+        * event: String
+
+        * type: "intent"
+        * intent: String
+        * locale: Language
+        * input: String
+        * slots: [] ->
+            * name: String
+            * value: Optional\<String>
+
+    **Answer:** (Code: 204 Changed, a skill can return "205 Content" if no internal state changed and the same request will always return the same answer)
+    * capabilities:
         * name: String
         * <capability data>
 
-    * type: "event"
-    * event: String
+*DELETE* **Server/vap/skillRegistry/{skill_system_id}** (Confirmable: Mandatory, Skill -> Registry)
+ * skillId: (The one like org.company.product)
 
-    * type: "intent"
-    * intent: String
-    * locale: Language
-    * input: String
-    * slots: [] ->
-        * name: String
-        * value: Optional\<String>
+**Answer**:
+* Either:
+    * OK! (Code: 202 Deleted)
+    * Error:
+        * 400 Bad >request -> skillId does not exist
+            * code: int -> 400
+            * type: "wrong skillId"
+            * object: String -> The skillId that didn't exist
+        * 401 Unauthorized: This skillId is not related to this address.
+            * code: int -> 401
+            * type: "unauthorized"
 
-**Answer:** (Code: 204 Changed, a skill can return "205 Content" if no internal state changed and the same request will always return the same answer)
-* capabilities:
-    * name: String
-    * <capability data>
 
 
 ## At any time:
 
 *POST* **Server/vap/skillRegistry/notification** (Confirmable: Optional, Skill -> Registry)
+* skillId: String
 * data: (Can send to multiple at the same time, one per client to send)
     * clientId: String -> SystemId of client 
     * capabilities:
@@ -155,6 +175,7 @@ The server is asking "Can you answer this request?"
 
 
 *GET* **Server/vap/skillRegistry/query** (Confirmable: Optional, Skill -> Registry)
+* skillId : String
 * data: [] -> (Can send to multiple at the same time, one per client to send)
     * clientId: String -> SystemId of client 
     * capabilities:
@@ -184,20 +205,3 @@ The server is asking "Can you answer this request?"
  
 Retrieve data from the server. The data is selected by the capabilities *Note:* Are those capabilities only implemented by the server or can the clients receive/send any info?
 
-
-## Shutdown
-
-*POST* **Server/vap/skillRegistry/skillClose** (Confirmable: Mandatory, Skill -> Registry)
- * skillId: (The one like org.company.product)
-
-**Answer**:
-* Either:
-    * OK! (Code: 202 Deleted)
-    * Error:
-        * 400 Bad >request -> skillId does not exist
-            * code: int -> 400
-            * type: "wrong skillId"
-            * object: String -> The skillId that didn't exist
-        * 401 Unauthorized: This skillId is not related to this address.
-            * code: int -> 401
-            * type: "unauthorized"

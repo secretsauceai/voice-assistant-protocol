@@ -4,6 +4,7 @@
 
 import asyncio
 import re
+from typing import Optional
 from urllib import response
 
 import aiocoap
@@ -12,6 +13,7 @@ import msgpack
 
 registry_address = "127.0.01"
 all_coaps_ip4 = "224.0.1.187"
+skill_id = "com.example.test"
 coap_host_reg = re.compile(r'^coap:\/\/([1-9.a-zA-Z]+)\/')
 
 def list_caps(payload):
@@ -64,21 +66,26 @@ class VapClient():
 
         self.client = await aiocoap.Context.create_client_context()
 
-    async def __find_registry(self) -> str:
+    async def __find_registry(self) -> Optional[str]:
         """ Find a registry using CoAP's discovery """
         request = aiocoap.Message(code=aiocoap.GET, uri=f'coap://{all_coaps_ip4}/.well-known/core?rt=vap-skill-registry')
         response = await self.client.request(request).response
 
         if "vap-skill-registry" in response.payload:
             m = coap_host_reg.match(response.payload.decode())
-            return request.get_request_uri(m.group(1))
+
+            if m:
+                return request.get_request_uri(m.group(1))
+        
+        return None
+    
     
     async def init(self):
         # Register whithin the server
 
         payload = {
             "name": "My test skill",
-            "id": "com.example.test",
+            "id": skill_id,
             "vapVersion": "1.0.0",
             "uniqueAuthenticationToken": "",
         }
@@ -112,6 +119,7 @@ class VapClient():
         # Send our utterances to the server for them to be taken account of
 
         payload = {
+            "skillId": skill_id,
             "nluData": [
                 {
                     "language": {
@@ -163,8 +171,8 @@ class VapClient():
     async def close(self):
         # We have finished, let it know to the server
 
-        payload = {"skillId":"com.example.test"}
-        request = aiocoap.Message(code=aiocoap.GET, payload=msgpack.packb(payload), uri=f'coap://{registry_address}/vap/skillRegistry/skillClose')
+        payload = {"skillId": skill_id}
+        request = aiocoap.Message(code=aiocoap.DELETE, payload=msgpack.packb(payload), uri=f'coap://{registry_address}/vap/skillRegistry/skills/{skill_id}')
 
         # Send it  to the registry and wait for a response
         response = await self.client.request(request).response
@@ -178,6 +186,7 @@ class VapClient():
         no response. """
 
         payload = {
+            "skillId": skill_id,
             "data":[{
                 "clientId": "123456789a",
                 "capabilities": [{
@@ -199,6 +208,7 @@ class VapClient():
         # Note: That inside "capabilities", except for "name", everything else 
         # is dependent on the capability and it is defined by it.
         payload = {
+            "skillId": skill_id,
             "data":[{
                 "clientId": "123456789a",
                 "capabilities": [{
@@ -209,16 +219,23 @@ class VapClient():
         }
 
         # Create request
-        request = aiocoap.Message(code=aiocoap.GET, payload=msgpack.packb(payload), uri=f'coap://{registry_address}/vap/skillRegistry/notification')
+        request = aiocoap.Message(code=aiocoap.GET, payload=msgpack.packb(payload), uri=f'coap://{registry_address}/vap/skillRegistry/query')
 
         response = await self.client.request(request).response
+
+        # Check if no error happened
+        if response.code != aiocoap.CONTENT:
+            raise Exception(f"Failed to disconenct from registry: {response.code}")
+
+        data_id = 0
+        capabilities_id = 1
 
         # Find the same capability, preferences, that we sent, remember we can 
         # receive multiple capabilities and multiple clients in a same response.
         # We find it by applying a filter
         cap_color = list(filter(
             lambda c: c["name"]=="preferences",
-            msgpack.unpackb(response.payload)["data"][0]["capabilities"]))
+            msgpack.unpackb(response.payload)[data_id][0][capabilities_id]))
 
         # Now that we have a list, get the first item and return the color that
         # we asked for
@@ -228,7 +245,16 @@ class VapClient():
 
     async def register(self):
         skill_id = "test_skill"
-        request = aiocoap.Message(code=aiocoap.GET, uri=f'coap://{registry_address}/vap/request/{skill_id}')
+
+        request = aiocoap.Message(
+            code=aiocoap.GET,
+            observe=0,
+            uri=f'coap://{registry_address}/vap/skillRegistry/skills/{skill_id}'
+        )
+
+        async for r in request.observation:
+            print("Got request from registry: ")
+            print(msgpack.unpackb(r.payload))
         
 
     

@@ -34,7 +34,7 @@ pub struct Response {
 
 pub struct SkillRegister {
     name: String,
-    port: u16,
+    ip_address: String,
     in_send: mpsc::Sender<(SkillRegisterMessage, oneshot::Sender<Response>)>,
 }
 
@@ -52,7 +52,7 @@ impl SkillRegister {
         Ok((
             SkillRegister {
                 name: name.to_string(),
-                port,
+                ip_address: format!("127.0.0.1:{}", port),
                 in_send,
             },
 
@@ -123,28 +123,38 @@ impl SkillRegister {
             
             match *request.get_method() {
                 Method::Get => {
-                    match request.get_path().as_str() {
-                        "vap/skillRegistry/query" => {
-                            handle_msg(request, &mut in_send, |p|{SkillRegisterMessage::Query(p)}).await
-                        }
+                    if request.get_path().starts_with("vap/skillRegistry/skills/") {
+                        request.response.map(|mut r| {
+                            r.set_status(coap_lite::ResponseType::Content);
+                            r.message.payload = vec![];
+                            r
+                        })
+                    }
 
-                        ".well-known/core" => {
-                            request.response.map(|mut r|{
-                                r.set_status(coap_lite::ResponseType::Content);
-                                r.message.payload = b"</vap>;rt=\"vap-skill-registry\"".to_vec();
-                                r
-                            })
-                        }
+                    else {
+                        match request.get_path().as_str() {
+                            "vap/skillRegistry/query" => {
+                                handle_msg(request, &mut in_send, |p|{SkillRegisterMessage::Query(p)}).await
+                            }
 
-                        _ => {
-                            if request.get_path().starts_with("vap/request/") {
-                                // TODO: Make sure only the same skill is asking for it.
+                            ".well-known/core" => {
                                 request.response.map(|mut r|{
-                                    r.set_status(coap_lite::ResponseType::Valid);
+                                    r.set_status(coap_lite::ResponseType::Content);
+                                    r.message.payload = b"</vap>;rt=\"vap-skill-registry\"".to_vec();
                                     r
                                 })
-                            } else {
-                                response_not_found(request.response)
+                            }
+
+                            _ => {
+                                if request.get_path().starts_with("vap/request/") {
+                                    // TODO: Make sure only the same skill is asking for it.
+                                    request.response.map(|mut r|{
+                                        r.set_status(coap_lite::ResponseType::Valid);
+                                        r
+                                    })
+                                } else {
+                                    response_not_found(request.response)
+                                }
                             }
                         }
                     }
@@ -164,10 +174,6 @@ impl SkillRegister {
                             handle_msg(request, &mut in_send, |p|{SkillRegisterMessage::Notification(p)}).await
                         }
 
-                        "vap/skillRegistry/skillClose" => {
-                            handle_msg(request, &mut in_send, |p|{SkillRegisterMessage::Close(p)}).await
-                        }
-
                         _ => response_not_found(request.response)
                     }                    
                 }
@@ -177,6 +183,16 @@ impl SkillRegister {
                         r.set_status(coap_lite::ResponseType::Valid);
                         r
                     })
+                }
+
+                Method::Delete => {
+                    if request.get_path().starts_with("vap/skillRegistry/skills/") {
+                        // TODO: Verify the name in the path is the same as the name in the request.
+                        handle_msg(request, &mut in_send, |p|{SkillRegisterMessage::Close(p)}).await
+                    }
+                    else {
+                        response_not_found(request.response)
+                    }
                 }
 
                 _ => {
@@ -189,7 +205,7 @@ impl SkillRegister {
             }
         }
 
-        let mut server = Server::new(format!("127.0.0.1:{}", self.port)).unwrap();
+        let mut server = Server::new(&self.ip_address).unwrap();
         server.enable_all_coap(0);
         server.run( |request| {    
             perform(request, self.in_send.clone())
@@ -197,20 +213,21 @@ impl SkillRegister {
         Ok(())
     }
 
-    pub fn skills_answerable(&mut self, ips: &[String]) -> Vec<MsgSkillCanAnswerResponse> {
-        // TODO: Move to using observe 
-        fn send_msg(ip: &str) -> Result<MsgSkillCanAnswerResponse, Error> {
-            let c = CoAPClient::new(ip).unwrap();
+    pub fn skills_answerable(&mut self, ids: &[String]) -> Vec<MsgSkillCanAnswerResponse> {
+        // TODO: Wait for the response using notifications.
+        fn send_msg(self_ip: &str, id: &str) -> Result<MsgSkillCanAnswerResponse, Error> {
+            let c = CoAPClient::new(self_ip).unwrap();
             let msg = MsgSkillCanAnswer{};
             let data = rmp_serde::to_vec(&msg).unwrap();
-            let resp = c.request_path("vap/canYouAnswer", Method::Get, Some(data), None).unwrap();
+            let path = format!("vap/skillRegistry/skills/{}", id);
+            let resp = c.request_path(&path, Method::Get, Some(data), None).unwrap();
             let resp_data = rmp_serde::from_read(Cursor::new(resp.message.payload)).unwrap();
             Ok(resp_data)
         }
 
         let mut answers = Vec::new();
-        for ip in ips {
-            match send_msg(ip) {
+        for id in ids {
+            match send_msg(&self.ip_address, id) {
                 Ok(resp) => {
                     println!("{:?}", resp);
                     answers.push(resp);
@@ -226,9 +243,9 @@ impl SkillRegister {
     }
 
     pub async fn activate_skill(&self, name: String, msg: MsgSkillRequest) -> Result<MsgSkillRequestResponse, Error> {
-        let c = CoAPClient::new(format!("127.0.0.1:{}", self.port)).unwrap();
+        let c = CoAPClient::new(&self.ip_address).unwrap();
         let data = rmp_serde::to_vec(&msg).unwrap();
-        let resp = c.request_path(&format!("vap/request/{}", name), Method::Put, Some(data), None).unwrap();
+        let resp = c.request_path(&format!("vap/skillRegistry/skills/{}", name), Method::Put, Some(data), None).unwrap();
         let resp_data = rmp_serde::from_read(Cursor::new(resp.message.payload)).unwrap();
         Ok(resp_data)
     }
