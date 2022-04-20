@@ -36,6 +36,7 @@ pub struct SkillRegister {
     name: String,
     ip_address: String,
     in_send: mpsc::Sender<(SkillRegisterMessage, oneshot::Sender<Response>)>,
+    
 }
 
 pub enum SkillRegisterMessage {
@@ -47,8 +48,10 @@ pub enum SkillRegisterMessage {
 }
 
 impl SkillRegister {
-    pub fn new(name: &str, port: u16) -> Result<(Self, SkillRegisterStream), Error> {   
+    pub fn new(name: &str, port: u16) -> Result<(Self, SkillRegisterStream, SkillRegisterOut), Error> {   
         let (in_send, in_recv) = mpsc::channel(20);
+        let ip_address = format!("127.0.0.1:{}", port);
+        let client = CoAPClient::new(&ip_address).unwrap();
         Ok((
             SkillRegister {
                 name: name.to_string(),
@@ -58,7 +61,9 @@ impl SkillRegister {
 
             SkillRegisterStream {
                 stream_in: in_recv,
-            }
+            },
+
+            SkillRegisterOut {client}
         ))
     }
 
@@ -212,22 +217,27 @@ impl SkillRegister {
         }).await.unwrap();
         Ok(())
     }
+}
 
-    pub fn skills_answerable(&mut self, ids: &[String]) -> Vec<MsgSkillCanAnswerResponse> {
+pub struct SkillRegisterOut {
+    client: CoAPClient
+}
+
+impl SkillRegisterOut {
+    pub fn skills_answerable(&self, ids: &[String]) -> Vec<MsgSkillCanAnswerResponse> {
         // TODO: Wait for the response using notifications.
-        fn send_msg(self_ip: &str, id: &str) -> Result<MsgSkillCanAnswerResponse, Error> {
-            let c = CoAPClient::new(self_ip).unwrap();
+        fn send_msg(client: &CoAPClient, id: &str) -> Result<MsgSkillCanAnswerResponse, Error> {
             let msg = MsgSkillCanAnswer{};
             let data = rmp_serde::to_vec(&msg).unwrap();
             let path = format!("vap/skillRegistry/skills/{}", id);
-            let resp = c.request_path(&path, Method::Get, Some(data), None).unwrap();
+            let resp = client.request_path(&path, Method::Get, Some(data), None).unwrap();
             let resp_data = rmp_serde::from_read(Cursor::new(resp.message.payload)).unwrap();
             Ok(resp_data)
         }
 
         let mut answers = Vec::new();
         for id in ids {
-            match send_msg(&self.ip_address, id) {
+            match send_msg(&self.client, id) {
                 Ok(resp) => {
                     println!("{:?}", resp);
                     answers.push(resp);
@@ -243,9 +253,8 @@ impl SkillRegister {
     }
 
     pub async fn activate_skill(&self, name: String, msg: MsgSkillRequest) -> Result<MsgSkillRequestResponse, Error> {
-        let c = CoAPClient::new(&self.ip_address).unwrap();
         let data = rmp_serde::to_vec(&msg).unwrap();
-        let resp = c.request_path(&format!("vap/skillRegistry/skills/{}", name), Method::Put, Some(data), None).unwrap();
+        let resp = self.client.request_path(&format!("vap/skillRegistry/skills/{}", name), Method::Put, Some(data), None).unwrap();
         let resp_data = rmp_serde::from_read(Cursor::new(resp.message.payload)).unwrap();
         Ok(resp_data)
     }

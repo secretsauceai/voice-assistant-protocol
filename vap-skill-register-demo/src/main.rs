@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
 use vap_skill_register::{
-    SkillRegister, Response, ResponseType, SkillRegisterStream,
-    SkillRegisterMessage, 
+    SkillRegister, Response, ResponseType, SkillRegisterStream, SkillRegisterOut,
+    SkillRegisterMessage,
     structures::{
-        MsgConnectResponse, Language, MsgQueryResponse,
+        MsgConnectResponse, Language, MsgQueryResponse, MsgSkillRequest,
+        msg_skill_request::{ClientData, RequestData},
         msg_query_response::{QueryData, QueryDataCapability},
     }
 };
@@ -15,11 +16,11 @@ mod conf {
 }
 
 struct MyData {
-
+    out: SkillRegisterOut
 }
 
 impl MyData {
-    async fn on_msg(&mut self, mut stream: SkillRegisterStream) -> Result<(), vap_skill_register::Error> {
+    async fn on_msg(&self, mut stream: SkillRegisterStream) -> Result<(), vap_skill_register::Error> {
         loop {
             let (msg, responder) = stream.recv().await?;
             let resp = match msg {
@@ -115,18 +116,35 @@ impl MyData {
             responder.send(resp).map_err(|_| vap_skill_register::Error::ClosedChannel)?;
         }
     }
+
+    async fn send_request(&self) {
+        self.out.activate_skill("com.example.test".into(), MsgSkillRequest {
+            client: ClientData {
+                system_id: "test-client".into(),
+                capabilities: vec![]
+            },
+            
+            request: RequestData {
+                type_: "intent".into(),
+                intent: "hello".into(),
+                locale: "en-US".into(),
+                slots: vec![]
+            }
+        });
+    }
 }
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    let (reg, stream) = SkillRegister::new("test-skill-register", conf::PORT).unwrap();
-    let mut m = MyData {};
+    let (reg, stream, out) = SkillRegister::new("test-skill-register", conf::PORT).unwrap();
+    let mut m = MyData {out};
     let mut request_timer = tokio::time::interval(tokio::time::Duration::from_secs(10));
 
     let send_requests = async {
         loop {
             request_timer.tick().await;
             println!("Sending request");
+            m.send_request();
         }
     };
 
