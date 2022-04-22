@@ -83,10 +83,9 @@ After that send:
 ## Skill interactions:
 
 *GET (Obeserve)* **Server/vap/skillRegistry/skills/{skill_system_id}**  (Confirmable: Optional, needs to be observed)
-Either **CanYouAnswer**:
     * skillId: String
     * request:
-        * type: "event"|"intent" -> Internally tagged request data.
+        * type: "event"|"intent"|"canYouAnswer" -> Internally tagged request data.
         * capabilities: [] ->
             * name: String
             * \<capability data>
@@ -102,40 +101,21 @@ Either **CanYouAnswer**:
             * name: String
             * value: Optional\<String>
 
-The server is asking "Can you answer this request?"
+**Answer:**
+Requests are answered via notifications.
 
-    **Answer:** (Code: 205 Content)
+**If type == "canYouAnswer":**
+The server is asking "Can you answer this request?" When multiple skills are capable of answering the same request (it could be a generic request like "turn off the kitchen lights") we send them the intent and the slots (like "turn_off" "kitchen lights") and each skill returns an estimation of how well they can answer this request.
+
+    (Code: 205 Content)
+    * request_id: u64
     * confidence: float
 
-    When multiple skills are capable of answering the same request (it could be a
-    generic request like "turn off the kitchen lights") we send them the intent and the slots (like "turn_off" "kitchen lights") and each skill returns an 
-    estimation of how well they can answer this request.
+    
 
-Or **request**:
-    * client:
-        * systemId: String -> An unique ID for the client to be recognized, it doesn't have to be the same one that the client provides, can be randomly generated.
-        * capabilities: [] ->
-            * name: String
-            * version: int
-
-    * request:
-        * type: "event"|"intent" -> Internally tagged request data.
-        * capabilities: [] -> Extra data sent by the client
-            * name: String
-            * <capability data>
-
-        * type: "event"
-        * event: String
-
-        * type: "intent"
-        * intent: String
-        * locale: Language
-        * input: String
-        * slots: [] ->
-            * name: String
-            * value: Optional\<String>
-
-    **Answer:** (Code: 204 Changed, a skill can return "205 Content" if no internal state changed and the same request will always return the same answer)
+**If type == "request" or type == "event":**:
+    (Code: 204 Changed, a skill can return "205 Content" if no internal state changed and the same request will always return the same answer).
+    * request_id: u64
     * capabilities:
         * name: String
         * <capability data>
@@ -162,10 +142,24 @@ Or **request**:
 *POST* **Server/vap/skillRegistry/notification** (Confirmable: Optional, Skill -> Registry)
 * skillId: String
 * data: (Can send to multiple at the same time, one per client to send)
-    * clientId: String -> SystemId of client 
+    * type: String
+    
+    * type == "requested" -> As response to an intent or an event
+    * requestId: String
     * capabilities:
         * name: String
         * <capability data>
+
+    * type == "standalone" -> Sent on it's own volition by the skill
+    * clientId: String -> SystemId of client
+    * capabilities:
+        * name: String
+        * <capability data>
+
+    * type == "canYouAnswer" -> Sent as a response to a canYouAnswer
+    * confidence: float
+    
+    
     
 
  A notification is a message started by a skill. Sometimes a skill needs to send

@@ -95,19 +95,8 @@ pub struct MsgRegisterIntentsResponse {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct MsgSkillCanAnswer {
-    // - pub request
-    // - pub slot
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct MsgSkillCanAnswerResponse {
-    // - pub request
-    // - pub slot
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgSkillRequest {
+    pub request_id: u64,
     pub client: msg_skill_request::ClientData,
     pub request: msg_skill_request::RequestData,
 }
@@ -129,9 +118,21 @@ pub mod msg_skill_request {
     }
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub enum RequestDataKind {
+        #[serde(rename="intent")]
+        Intent,
+
+        #[serde(rename="event")]
+        Event,
+        
+        #[serde(rename="canAnswer")]
+        CanAnswer
+    }
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
     pub struct RequestData {
         #[serde(rename="type")]
-        pub type_: String,
+        pub type_: RequestDataKind,
         pub intent: String,
         pub locale: String,
         pub slots: Vec<RequestSlot>,
@@ -142,11 +143,6 @@ pub mod msg_skill_request {
         pub name: String,
         pub value: Option<String>,
     }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct MsgSkillRequestResponse {
-    pub capabilities: Vec<PlainCapability>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -161,12 +157,37 @@ pub mod msg_notification {
     use serde::{Deserialize, Serialize};
     
     #[derive(Clone, Debug, Deserialize, Serialize)]
-    pub struct Data {
-        #[serde(rename="clientId")]
-        pub client_id: String,
+    #[serde(tag="type")]
+    pub enum Data {
+        #[serde(rename="requested")]
+        Requested {
+            #[serde(rename="requestId")]
+            request_id: u64,
 
-        pub capabilities: Vec<super::PlainCapability>,
+            capabilities: Vec<super::PlainCapability>,
+        },
+
+        #[serde(rename="standalone")]
+        StandAlone {
+            #[serde(rename="clientId")]
+            client_id: String,
+
+            capabilities: Vec<super::PlainCapability>
+        },
+        
+        #[serde(rename="canYouAnswer")]
+        CanYouAnswer {
+            #[serde(rename="requestId")]
+            request_id: u64,
+            
+            confidence: f32
+        }
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct MsgNotificationResponse {
+
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

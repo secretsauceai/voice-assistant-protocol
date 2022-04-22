@@ -5,7 +5,7 @@ use vap_skill_register::{
     SkillRegisterMessage,
     structures::{
         MsgConnectResponse, Language, MsgQueryResponse, MsgSkillRequest,
-        msg_skill_request::{ClientData, RequestData},
+        msg_skill_request::{ClientData, RequestData, RequestDataKind},
         msg_query_response::{QueryData, QueryDataCapability},
     }
 };
@@ -119,32 +119,33 @@ impl MyData {
 
     async fn send_request(&self) {
         self.out.activate_skill("com.example.test".into(), MsgSkillRequest {
+            request_id: 0, // Will be filled by the registry
             client: ClientData {
                 system_id: "test-client".into(),
                 capabilities: vec![]
             },
             
             request: RequestData {
-                type_: "intent".into(),
+                type_: RequestDataKind::Intent,
                 intent: "hello".into(),
                 locale: "en-US".into(),
                 slots: vec![]
             }
-        });
+        }).await.unwrap();
     }
 }
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let (reg, stream, out) = SkillRegister::new("test-skill-register", conf::PORT).unwrap();
-    let mut m = MyData {out};
+    let m = MyData {out};
     let mut request_timer = tokio::time::interval(tokio::time::Duration::from_secs(10));
 
     let send_requests = async {
         loop {
             request_timer.tick().await;
             println!("Sending request");
-            m.send_request();
+            m.send_request().await;
         }
     };
 

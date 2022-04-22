@@ -246,15 +246,20 @@ class VapClient():
     async def register(self):
         skill_id = "test_skill"
 
-        request = aiocoap.Message(
+        message = aiocoap.Message(
             code=aiocoap.GET,
-            observe=0,
+            observe=9999999999999,
             uri=f'coap://{registry_address}/vap/skillRegistry/skills/{skill_id}'
         )
+
+        request = self.client.request(message)
+        
 
         async for r in request.observation:
             print("Got request from registry: ")
             print(msgpack.unpackb(r.payload))
+
+            
         
 
     
@@ -273,6 +278,8 @@ async def main():
     # Perform notifications and queries, note this can be done whenever
     await client.notification()
     await client.query()
+
+    await client.register()
 
     # Run forever
     await asyncio.get_running_loop().create_future()
