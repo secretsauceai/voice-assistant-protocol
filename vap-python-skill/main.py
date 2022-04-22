@@ -5,13 +5,11 @@
 import asyncio
 import re
 from typing import Optional
-from urllib import response
 
 import aiocoap
-import aiocoap.resource as resource
 import msgpack
 
-registry_address = "127.0.01"
+registry_address = "127.0.0.1"
 all_coaps_ip4 = "224.0.1.187"
 skill_id = "com.example.test"
 coap_host_reg = re.compile(r'^coap:\/\/([1-9.a-zA-Z]+)\/')
@@ -19,44 +17,6 @@ coap_host_reg = re.compile(r'^coap:\/\/([1-9.a-zA-Z]+)\/')
 def list_caps(payload):
     """Transform a list of capabilities into a string."""
     return ','.join([cap["name"] for cap in payload["request"]["capabilities"]])
-
-class VapRequestResource(resource.Resource):
-    """A CoAP resource that answers a VAP "request". When someone calls
-    coap://<skill_address>/vap/request, this will trigger """
-
-    def render_post(self, request):
-        """Handle a POST message, VAP requests are always POSTs."""
-
-        # Decode the MsgPack payload
-        payload = msgpack.unpackb(request.payload)
-
-        caps = list_caps(payload)
-        print(f"Received a request with capabilities: {caps}")
-
-        # Check if it is a known intent
-        if payload["request"]["intent"] == "hello":
-            data_response = {"capabilities": [{"name":"text", "text": "hello there"}]}
-
-            # Message to be sent back to the server
-            return aiocoap.Message(payload=msgpack.packb(data_response))
-            
-
-class VapCanYouAnswerResource(resource.Resource):
-    """A CoAP resource that answers a VAP "can you answer". When someone calls
-    coap://<skill_address>/vap/canYouAnswer, this will trigger"""
-
-    def render_get(self, request):
-        """Handle a GET message, VAP can you answer requests are always GETs."""
-
-        payload = msgpack.unpackb(request.payload)
-        caps = list_caps(payload)
-
-        new_payload = {
-            "confidence": 1.0
-        }
-
-        # Message to be sent back to the server
-        return aiocoap.Message(code=aiocoap.CHANGED, payload=msgpack.packb(new_payload))
 
 class VapClient():
     async def _init(self):
@@ -257,7 +217,14 @@ class VapClient():
 
         async for r in request.observation:
             print("Got request from registry: ")
-            print(msgpack.unpackb(r.payload))
+            payload = msgpack.unpackb(r.payload)
+            print(payload)
+            request_id = 1
+            type_id = 0
+            request_type = payload[request_id][type_id]
+            if request_type == "canYouAnswer":
+                print("Got a canYouAnswer request")
+            
 
             
         
