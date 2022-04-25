@@ -187,7 +187,36 @@ pub mod msg_notification {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgNotificationResponse {
+    pub data: Vec<msg_notification_response::Data>
+}
 
+pub mod msg_notification_response {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    #[serde(tag="type")]
+    pub enum Data {
+        #[serde(rename="requested")]
+        Requested {
+            #[serde(rename="requestId")]
+            request_id: u64,
+            code: u16,
+        },
+
+        #[serde(rename="standalone")]
+        StandAlone {
+            #[serde(rename="clientId")]
+            client_id: String,
+            code: u16,
+        },
+        
+        #[serde(rename="canYouAnswer")]
+        CanYouAnswer {
+            #[serde(rename="requestId")]
+            request_id: u64,
+            code: u16,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

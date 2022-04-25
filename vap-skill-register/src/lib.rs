@@ -5,12 +5,13 @@ use std::sync::Arc;
 
 use coap_lite::{RequestType as Method, CoapRequest, CoapResponse};
 use coap::{CoAPClient, Server};
+use futures::future::{join, join_all};
 use futures::{channel::{mpsc, oneshot}, StreamExt, SinkExt, lock::Mutex};
-use rmp_serde::from_read;
+use rmp_serde::{from_read, to_vec_named};
 use serde::de::DeserializeOwned;
 use thiserror::Error;
 use vap_common_skill::structures::*;
-use vap_common_skill::structures::{msg_skill_request::{ClientData, RequestData}, msg_notification::Data};
+use vap_common_skill::structures::{msg_skill_request::{ClientData, RequestData}};
 
 pub use coap_lite::ResponseType;
 pub use vap_common_skill::structures as structures;
@@ -41,14 +42,25 @@ pub struct SkillRegister {
     name: String,
     ip_address: String,
     in_send: mpsc::Sender<(SkillRegisterMessage, oneshot::Sender<Response>)>,
-    pending_requests: SharedPending<Vec<PlainCapability>>,
+    pending_requests: SharedPending<(Vec<PlainCapability>, oneshot::Sender<Vec<RequestResponse>>)>,
     pending_can_you: SharedPending<f32>
+}
+
+pub struct Notification {
+    pub skill_id: String,
+    pub data: Vec<NotificationData>
+}
+
+#[derive(Debug, Clone)]
+pub struct NotificationData {
+    pub client_id: String,
+    pub capabilities: Vec<structures::PlainCapability>
 }
 
 pub enum SkillRegisterMessage {
     Connect(MsgConnect),
     RegisterIntents(MsgRegisterIntents),
-    Notification(MsgNotification),
+    Notification(Notification),
     Query(MsgQuery),
     Close(MsgSkillClose),
 }
@@ -82,7 +94,7 @@ impl SkillRegister {
         async fn perform(
             request: CoapRequest<SocketAddr>,
             mut in_send: mpsc::Sender<(SkillRegisterMessage, oneshot::Sender<Response>)>,
-            pending_requests: &SharedPending<Vec<PlainCapability>>,
+            pending_requests: &SharedPending<(Vec<PlainCapability>, oneshot::Sender<Vec<RequestResponse>>)>,
             pending_can_you: &SharedPending<f32>
         ) -> Option<CoapResponse> {
             fn read_payload<T: DeserializeOwned>(payload: &[u8], r: Option<CoapResponse>) -> Result<(T, Option<CoapResponse>), Option<CoapResponse>> {
@@ -220,41 +232,114 @@ impl SkillRegister {
                             
                             match read_payload(&request.message.payload, request.response) {
                                 Ok::<(MsgNotification,_),_>((msg, resp)) => {
-                                    let (sender, receiver) = oneshot::channel();
+                                    let mut standalone = vec![];
+                                    let mut resolutions = vec![];
 
-                                    // XXX: Think of how to sort this when we have multiple requests of each kind
-                                    for a in &msg.data {
+                                    enum RequestResolution {
+                                        Done(msg_notification_response::Data),
+                                        InProcess(oneshot::Receiver<Vec<RequestResponse>>)
+                                    }
+
+                                    let skill_id = msg.skill_id;
+
+                                    for a in msg.data {
                                         match a {
-                                            Data::CanYouAnswer{request_id, confidence} => {
-                                                // XXX: Redirect to it's request
-                                                match pending_can_you.lock().await.remove(&request_id) {
-                                                    Some(sender) => {
-                                                        sender.send(*confidence).unwrap();
+                                            msg_notification::Data::CanYouAnswer{request_id, confidence} => {
+                                                fn can_you_answer_done(response: coap_lite::ResponseType, id: RequestId) -> RequestResolution {
+                                                    RequestResolution::Done(msg_notification_response::Data::CanYouAnswer {
+                                                        code: response as u16,
+                                                        request_id: id
+                                                    })
+                                                }
+
+                                                let resol= match pending_can_you.lock().await.remove(&request_id) {
+                                                    Some(pending_sender) => {
+                                                        pending_sender.send(confidence).unwrap();
+                                                        can_you_answer_done(coap_lite::ResponseType::Valid, request_id)
+                                                        
                                                     }
                                                     None => {
-                                                        // XXX: Send error
+                                                        can_you_answer_done(coap_lite::ResponseType::BadRequest, request_id)
                                                     }
-                                                }
+                                                };
+
+                                                resolutions.push(resol)
                                             }
-                                            Data::Requested{request_id, capabilities} => {
-                                                // XXX: Redirect to it's request
-                                                match pending_requests.lock().await.remove(&request_id) {
-                                                    Some(sender) => {
-                                                        sender.send(capabilities.clone()).unwrap();
+                                            msg_notification::Data::Requested {request_id, capabilities} => {
+                                                fn requested_done(response: coap_lite::ResponseType, id: RequestId) -> RequestResolution {
+                                                    RequestResolution::Done(msg_notification_response::Data::Requested {
+                                                        code: response as u16,
+                                                        request_id: id
+                                                    })
+                                                }
+
+                                                let resol = match pending_requests.lock().await.remove(&request_id) {
+                                                    Some(pending_sender) => {
+
+                                                        let (sender, receiver) = oneshot::channel();
+                                                        pending_sender.send((capabilities.clone(), sender)).unwrap();
+                                                        RequestResolution::InProcess(receiver)
                                                     }
                                                     None => {
-                                                        // XXX: Send error
+                                                        requested_done(coap_lite::ResponseType::BadRequest, request_id)
                                                     }
-                                                }
+                                                };
+
+                                                resolutions.push(resol)
                                             }
-                                            Data::StandAlone{client_id, capabilities} => {
-                                                // XXX: Redirect to the in channel
-                                                in_send.send((SkillRegisterMessage::Notification(msg.clone()), sender)).await.unwrap();
+                                            msg_notification::Data::StandAlone{client_id, capabilities} => {
+                                                standalone.push(NotificationData {client_id, capabilities});
                                             }
                                         }
                                     }
 
-                                    wait_response(receiver, resp).await
+                                    let mut futures = vec![];
+                                    let mut other_res = vec![];
+                                    for resolution in resolutions {
+                                        match resolution {
+                                            RequestResolution::Done(data) => {
+                                                other_res.push(data);
+                                            }
+                                            RequestResolution::InProcess(receiver) => {
+                                                futures.push(receiver)                                                
+                                            }
+                                        }
+                                    }
+                                    let futs = join_all(futures);                               
+
+                                    if !standalone.is_empty() {
+                                        let send_standalone = async {
+                                            let (sender, receiver) = oneshot::channel();
+                                            in_send.send((SkillRegisterMessage::Notification(Notification {
+                                                skill_id: skill_id.clone(),
+                                                data: standalone,
+                                            }), sender)).await.unwrap();
+                                            wait_response(receiver, resp).await
+                                        };
+
+                                        // TODO: Any result that is not standalone is ignored right now (though it is processed)
+                                        join(send_standalone, futs).await.0
+
+                                    }
+                                    else {
+                                        let res = futs.await.into_iter()
+                                            .flat_map(|r|r.unwrap())
+                                            .map(|n|msg_notification_response::Data::Requested {
+                                                code: n.code,
+                                                request_id: n.request_id
+                                            });
+                                        other_res.extend(res);
+                                            
+                                        resp.map(|mut r| {
+                                            let payload = to_vec_named(&MsgNotificationResponse {
+                                                data: other_res
+                                            }).unwrap();
+                                            
+                                            r.set_status(coap_lite::ResponseType::Valid);
+                                            r.message.payload = payload;
+                                            r
+                                        })
+                                    }
                                 }
                                 Err(r) => {
                                     r
@@ -300,34 +385,62 @@ impl SkillRegister {
         let mut server = Server::new(&self.ip_address).unwrap();
         server.enable_all_coap(0);
         server.run( |request| {    
-            perform(request, self.in_send.clone(), &self.pending_requests, &self.pending_can_you).await
+            perform(request, self.in_send.clone(), &self.pending_requests, &self.pending_can_you)
         }).await.unwrap();
         Ok(())
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct NotificationResponse {
+    pub client_id: String,
+    pub code: u16
+}
+
+#[derive(Debug, Clone)]
+pub struct RequestResponse {
+    pub request_id: u64,
+    pub code: u16
+}
+
 pub struct SkillRegisterOut {
     client: CoAPClient,
-    pending_requests: SharedPending<Vec<PlainCapability>>,
+    pending_requests: SharedPending<(Vec<PlainCapability>, oneshot::Sender<Vec<RequestResponse>>)>,
     pending_can_you: SharedPending<f32>,
     next_request: RefCell<RequestId>
 }
 
 impl SkillRegisterOut {
-    pub fn skills_answerable(&self, ids: &[String], request: RequestData, client: ClientData) -> Vec<MsgNotification> {
+    pub async fn skills_answerable(&self, ids: &[String], request: RequestData, client: ClientData) -> Vec<MsgNotification> {
         // TODO: Respond to the notification
-        fn send_msg(coap_self: &CoAPClient, id: &str, request: RequestData, request_id: RequestId, client: ClientData) -> Result<MsgNotification, Error> {
+        async fn send_msg(
+            coap_self: &CoAPClient,
+            id: &str,
+            request: RequestData,
+            request_id: RequestId,
+            client: ClientData,
+            pending_can_you: &SharedPending<f32>,
+        ) -> Result<MsgNotification, Error> {
             let msg = MsgSkillRequest {client, request_id, request};
             let data = rmp_serde::to_vec(&msg).unwrap();
             let path = format!("vap/skillRegistry/skills/{}", id);
             let resp = coap_self.request_path(&path, Method::Get, Some(data), None).unwrap();
-            let resp_data = rmp_serde::from_read(Cursor::new(resp.message.payload)).unwrap();
-            Ok(resp_data)
+            
+            assert_eq!(resp.get_status(), &coap_lite::ResponseType::Valid);
+
+            let (sender, receiver) = oneshot::channel();
+            pending_can_you.lock().await.insert(request_id, sender);
+            let a = receiver.await.unwrap();
+
+            Ok(MsgNotification{
+                skill_id: id.to_string(),
+                data: vec![msg_notification::Data::CanYouAnswer{request_id, confidence: a}]
+            })
         }
 
         let mut answers = Vec::new();
         for id in ids {
-            match send_msg(&self.client, id, request.clone(), self.get_id(), client.clone()) {
+            match send_msg(&self.client, id, request.clone(), self.get_id(), client.clone(), &self.pending_can_you).await {
                 Ok(resp) => {
                     println!("{:?}", resp);
                     answers.push(resp);
@@ -342,6 +455,8 @@ impl SkillRegisterOut {
         answers
     }
 
+
+
     fn get_id(&self) -> RequestId {
         let mut ref_id = self.next_request.borrow_mut();
         let id = *ref_id;
@@ -350,7 +465,7 @@ impl SkillRegisterOut {
         id
     }
 
-    pub async fn activate_skill(&self, name: String, mut msg: MsgSkillRequest) -> Result<Vec<PlainCapability>, Error> {
+    pub async fn activate_skill(&self, name: String, mut msg: MsgSkillRequest) -> Result<(Vec<PlainCapability>, oneshot::Sender<Vec<RequestResponse>>), Error> {
         // TODO: Respond to the notification
         let req_id = self.get_id();
         msg.request_id = req_id;

@@ -83,9 +83,14 @@ After that send:
 ## Skill interactions:
 
 *GET (Obeserve)* **Server/vap/skillRegistry/skills/{skill_system_id}**  (Confirmable: Optional, needs to be observed)
+
+*Empty payload*
+
+**Answer:**
+Initial Get request
     * skillId: String
     * request:
-        * type: "event"|"intent"|"canYouAnswer" -> Internally tagged request data.
+        * type: "event"|"intent"|"canYouAnswer"|"standalone" -> Internally tagged request data.
         * capabilities: [] ->
             * name: String
             * \<capability data>
@@ -101,8 +106,7 @@ After that send:
             * name: String
             * value: Optional\<String>
 
-**Answer:**
-Requests are answered via notifications.
+Requests are answered via notifications. This is their structure:
 
 **If type == "canYouAnswer":**
 The server is asking "Can you answer this request?" When multiple skills are capable of answering the same request (it could be a generic request like "turn off the kitchen lights") we send them the intent and the slots (like "turn_off" "kitchen lights") and each skill returns an estimation of how well they can answer this request.
@@ -111,9 +115,7 @@ The server is asking "Can you answer this request?" When multiple skills are cap
     * request_id: u64
     * confidence: float
 
-    
-
-**If type == "request" or type == "event":**:
+**If type == "intent" or type == "event":**:
     (Code: 204 Changed, a skill can return "205 Content" if no internal state changed and the same request will always return the same answer).
     * request_id: u64
     * capabilities:
@@ -158,15 +160,27 @@ The server is asking "Can you answer this request?" When multiple skills are cap
 
     * type == "canYouAnswer" -> Sent as a response to a canYouAnswer
     * confidence: float
-    
-    
-    
 
  A notification is a message started by a skill. Sometimes a skill needs to send
  information on it's own, not as an answer to something the user asked, whether
  it's a stream of sound or whether is just an alarm. Note that the server can
  also receive notifications.
 
+ **Answer:**
+ * If the base message is ok: Code 204 Changed (Or 205 If everything inside is cacheable).
+
+ * data:
+    * type: String
+    * code: int
+    
+    * type == "requested"  | type == "canYouAnswer"
+        * requestId: String
+    * type == "standalone"
+        * clientId: String
+
+* Errors:
+    if type == "requested" | type == "canYouAnswer":
+        * 402 Bad Option if the request does not exist or is not assigned to this skill
 
 *GET* **Server/vap/skillRegistry/query** (Confirmable: Optional, Skill -> Registry)
 * skillId : String
@@ -177,7 +191,7 @@ The server is asking "Can you answer this request?" When multiple skills are cap
         * <capability data>
  
 **Answer:** (Code: 205 Content)
- * data: [] ->
+    * data: [] ->
     * clientId: String -> SystemId of client 
     * capabilities:
         * name: String
