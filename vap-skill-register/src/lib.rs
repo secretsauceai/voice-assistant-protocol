@@ -42,7 +42,7 @@ pub struct SkillRegister {
     name: String,
     ip_address: String,
     in_send: mpsc::Sender<(SkillRegisterMessage, oneshot::Sender<Response>)>,
-    pending_requests: SharedPending<(Vec<PlainCapability>, oneshot::Sender<Vec<RequestResponse>>)>,
+    pending_requests: SharedPending<(Vec<PlainCapability>, oneshot::Sender<RequestResponse>)>,
     pending_can_you: SharedPending<f32>
 }
 
@@ -94,7 +94,7 @@ impl SkillRegister {
         async fn perform(
             request: CoapRequest<SocketAddr>,
             mut in_send: mpsc::Sender<(SkillRegisterMessage, oneshot::Sender<Response>)>,
-            pending_requests: &SharedPending<(Vec<PlainCapability>, oneshot::Sender<Vec<RequestResponse>>)>,
+            pending_requests: &SharedPending<(Vec<PlainCapability>, oneshot::Sender<RequestResponse>)>,
             pending_can_you: &SharedPending<f32>
         ) -> Option<CoapResponse> {
             fn read_payload<T: DeserializeOwned>(payload: &[u8], r: Option<CoapResponse>) -> Result<(T, Option<CoapResponse>), Option<CoapResponse>> {
@@ -237,7 +237,7 @@ impl SkillRegister {
 
                                     enum RequestResolution {
                                         Done(msg_notification_response::Data),
-                                        InProcess(oneshot::Receiver<Vec<RequestResponse>>)
+                                        InProcess((RequestId, oneshot::Receiver<RequestResponse>))
                                     }
 
                                     let skill_id = msg.skill_id;
@@ -278,7 +278,7 @@ impl SkillRegister {
 
                                                         let (sender, receiver) = oneshot::channel();
                                                         pending_sender.send((capabilities.clone(), sender)).unwrap();
-                                                        RequestResolution::InProcess(receiver)
+                                                        RequestResolution::InProcess((request_id, receiver))
                                                     }
                                                     None => {
                                                         requested_done(coap_lite::ResponseType::BadRequest, request_id)
@@ -305,6 +305,7 @@ impl SkillRegister {
                                             }
                                         }
                                     }
+                                    let (request_ids, futures) = futures.into_iter().unzip::<_,_,Vec<_>, Vec<_>>();
                                     let futs = join_all(futures);                               
 
                                     if !standalone.is_empty() {
@@ -323,10 +324,11 @@ impl SkillRegister {
                                     }
                                     else {
                                         let res = futs.await.into_iter()
-                                            .flat_map(|r|r.unwrap())
-                                            .map(|n|msg_notification_response::Data::Requested {
+                                            .map(|r|r.unwrap())
+                                            .zip(request_ids)
+                                            .map(|(n, request_id)|msg_notification_response::Data::Requested {
                                                 code: n.code,
-                                                request_id: n.request_id
+                                                request_id
                                             });
                                         other_res.extend(res);
                                             
@@ -399,13 +401,12 @@ pub struct NotificationResponse {
 
 #[derive(Debug, Clone)]
 pub struct RequestResponse {
-    pub request_id: u64,
     pub code: u16
 }
 
 pub struct SkillRegisterOut {
     client: CoAPClient,
-    pending_requests: SharedPending<(Vec<PlainCapability>, oneshot::Sender<Vec<RequestResponse>>)>,
+    pending_requests: SharedPending<(Vec<PlainCapability>, oneshot::Sender<RequestResponse>)>,
     pending_can_you: SharedPending<f32>,
     next_request: RefCell<RequestId>
 }
@@ -455,8 +456,6 @@ impl SkillRegisterOut {
         answers
     }
 
-
-
     fn get_id(&self) -> RequestId {
         let mut ref_id = self.next_request.borrow_mut();
         let id = *ref_id;
@@ -465,7 +464,7 @@ impl SkillRegisterOut {
         id
     }
 
-    pub async fn activate_skill(&self, name: String, mut msg: MsgSkillRequest) -> Result<(Vec<PlainCapability>, oneshot::Sender<Vec<RequestResponse>>), Error> {
+    pub async fn activate_skill(&self, name: String, mut msg: MsgSkillRequest) -> Result<(Vec<PlainCapability>, oneshot::Sender<RequestResponse>), Error> {
         // TODO: Respond to the notification
         let req_id = self.get_id();
         msg.request_id = req_id;
