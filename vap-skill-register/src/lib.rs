@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::{io::Cursor, collections::HashMap};
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as SyncMutex};
 
 use coap_lite::{RequestType as Method, CoapRequest, CoapResponse};
 use coap::{CoAPClient, Server};
@@ -43,7 +43,8 @@ pub struct SkillRegister {
     ip_address: String,
     in_send: mpsc::Sender<(SkillRegisterMessage, oneshot::Sender<Response>)>,
     pending_requests: SharedPending<(Vec<PlainCapability>, oneshot::Sender<RequestResponse>)>,
-    pending_can_you: SharedPending<f32>
+    pending_can_you: SharedPending<f32>,
+    current_skills: Arc<SyncMutex<HashMap<String, ()>>>
 }
 
 pub struct Notification {
@@ -65,6 +66,14 @@ pub enum SkillRegisterMessage {
     Close(MsgSkillClose),
 }
 
+fn respond(resp: Option<CoapResponse>, st: ResponseType, pl: Vec<u8>) -> Option<CoapResponse> {
+    resp.map(|mut c|{
+        c.set_status(st);
+        c.message.payload = pl;
+        c
+    })
+}
+
 impl SkillRegister {
     pub fn new(name: &str, port: u16) -> Result<(Self, SkillRegisterStream, SkillRegisterOut), Error> {   
         let (in_send, in_recv) = mpsc::channel(20);
@@ -78,7 +87,8 @@ impl SkillRegister {
                 ip_address: format!("127.0.0.1:{}", port),
                 in_send,
                 pending_requests: pending_requests.clone(),
-                pending_can_you: pending_can_you.clone()
+                pending_can_you: pending_can_you.clone(),
+                current_skills: Arc::new(SyncMutex::new(HashMap::new()))
             },
 
             SkillRegisterStream {
@@ -95,7 +105,8 @@ impl SkillRegister {
             request: CoapRequest<SocketAddr>,
             mut in_send: mpsc::Sender<(SkillRegisterMessage, oneshot::Sender<Response>)>,
             pending_requests: &SharedPending<(Vec<PlainCapability>, oneshot::Sender<RequestResponse>)>,
-            pending_can_you: &SharedPending<f32>
+            pending_can_you: &SharedPending<f32>,
+            current_skills: Arc<SyncMutex<HashMap<String, ()>>>
         ) -> Option<CoapResponse> {
             fn read_payload<T: DeserializeOwned>(payload: &[u8], r: Option<CoapResponse>) -> Result<(T, Option<CoapResponse>), Option<CoapResponse>> {
                 match from_read(Cursor::new(payload)) {
@@ -123,23 +134,20 @@ impl SkillRegister {
             }
 
             fn response_not_found(r: Option<CoapResponse>) -> Option<CoapResponse> {
-                r.map(|mut r| {
-                    r.set_status(coap_lite::ResponseType::MethodNotAllowed);
-                    r
-                })
+                respond(r, ResponseType::MethodNotAllowed, vec![])
             }
 
-            async fn wait_response(
+            async fn wait_response<F>(
                 receiver: oneshot::Receiver<Response>,
-                resp: Option<CoapResponse>
-            ) -> Option<CoapResponse> {
+                resp: Option<CoapResponse>,
+                cb: F
+            ) -> Option<CoapResponse> where
+            F: FnOnce(&Response)
+             {
                 match receiver.await {
                     Ok(resp_data) => {
-                        resp.map(|mut r|{
-                            r.set_status(resp_data.status);
-                            r.message.payload = resp_data.payload;
-                            r
-                        })
+                        cb(&resp_data);
+                        respond(resp, resp_data.status, resp_data.payload)
                     }
                     Err(_) => {
                         None
@@ -147,18 +155,25 @@ impl SkillRegister {
                 }  
             }
 
-            async fn handle_msg<T: DeserializeOwned, F>(
+            async fn handle_msg<T: DeserializeOwned, F, F2>(
                 request: CoapRequest<SocketAddr>,
                 in_send: &mut mpsc::Sender<(SkillRegisterMessage, oneshot::Sender<Response>)>,
+                key_check: F2,
                 cb: F,
             ) -> Option<CoapResponse> where
-                F: FnOnce(T) -> SkillRegisterMessage{
+                F: FnOnce(T) -> SkillRegisterMessage,
+                F2: FnOnce(&T) -> bool{
 
                 match read_payload(&request.message.payload, request.response) {
                     Ok::<(T,_),_>((p, resp)) => {
-                        let (sender, receiver) = oneshot::channel();
-                        in_send.send((cb(p), sender)).await.unwrap();
-                        wait_response(receiver, resp).await
+                        if  key_check(&p){
+                            let (sender, receiver) = oneshot::channel();
+                            in_send.send((cb(p), sender)).await.unwrap();
+                            wait_response(receiver, resp, |_|{}).await
+                        }
+                        else {
+                            respond(resp, ResponseType::BadRequest, vec![])
+                        }
                     }
                     Err(r) => {
                         r
@@ -170,11 +185,7 @@ impl SkillRegister {
             match *request.get_method() {
                 Method::Get => {
                     if request.get_path().starts_with("vap/skillRegistry/skills/") {
-                        request.response.map(|mut r| {
-                            r.set_status(coap_lite::ResponseType::Content);
-                            r.message.payload = vec![];
-                            r
-                        })
+                        respond(request.response, ResponseType::Content, vec![])
                     }
 
                     else {
@@ -183,25 +194,19 @@ impl SkillRegister {
                                 handle_msg(
                                     request,
                                     &mut in_send,
+                                    |p: &MsgQuery|current_skills.lock().unwrap().contains_key(&p.skill_id),
                                     |p|{SkillRegisterMessage::Query(p)}
                                 ).await
                             }
 
                             ".well-known/core" => {
-                                request.response.map(|mut r|{
-                                    r.set_status(coap_lite::ResponseType::Content);
-                                    r.message.payload = b"</vap>;rt=\"vap-skill-registry\"".to_vec();
-                                    r
-                                })
+                                respond(request.response, ResponseType::Content, b"</vap>;rt=\"vap-skill-registry\"".to_vec())
                             }
 
                             _ => {
                                 if request.get_path().starts_with("vap/request/") {
                                     // TODO: Make sure only the same skill is asking for it.
-                                    request.response.map(|mut r|{
-                                        r.set_status(coap_lite::ResponseType::Valid);
-                                        r
-                                    })
+                                    respond(request.response, ResponseType::Valid, vec![])
                                 } else {
                                     response_not_found(request.response)
                                 }
@@ -213,17 +218,36 @@ impl SkillRegister {
                 Method::Post => {                 
                     match request.get_path().as_str() {
                         "vap/skillRegistry/connect" => {
-                            handle_msg(
-                                request,
-                                &mut in_send,
-                                |p|{SkillRegisterMessage::Connect(p)}
-                            ).await
+                            match read_payload(&request.message.payload, request.response) {
+                                Ok::<(MsgConnect,_),_>((p, resp)) => {
+                                    if !current_skills.lock().unwrap().contains_key(&p.id) {
+                                        let (sender, receiver) = oneshot::channel();
+                                        let skill_id = p.id.clone();
+                                        in_send.send((SkillRegisterMessage::Connect(p), sender)).await.unwrap();
+                                        
+                                        wait_response(receiver, resp, |r| {
+                                            let code = r.status as u16;
+                                            // If it is regarded as "OK"
+                                            if (200..=299).contains(&code) {
+                                                current_skills.lock().unwrap().insert(skill_id,());
+                                            }
+                                        }).await
+                                    }
+                                    else {
+                                        respond(resp, ResponseType::BadRequest, vec![])
+                                    }
+                                }
+                                Err(r) => {
+                                    r
+                                }
+                            }
                         }
 
                         "vap/skillRegistry/registerIntents" => {
                             handle_msg(
                                 request,
                                 &mut in_send,
+                                |p: &MsgRegisterIntents|current_skills.lock().unwrap().contains_key(&p.skill_id),
                                 |p|{SkillRegisterMessage::RegisterIntents(p)}
                             ).await
                         }
@@ -315,7 +339,7 @@ impl SkillRegister {
                                                 skill_id: skill_id.clone(),
                                                 data: standalone,
                                             }), sender)).await.unwrap();
-                                            wait_response(receiver, resp).await
+                                            wait_response(receiver, resp, |_|{}).await
                                         };
 
                                         // TODO: Any result that is not standalone is ignored right now (though it is processed)
@@ -361,13 +385,26 @@ impl SkillRegister {
                 }
 
                 Method::Delete => {
-                    if request.get_path().starts_with("vap/skillRegistry/skills/") {
-                        // TODO: Verify the name in the path is the same as the name in the request.
-                        handle_msg(
-                            request,
-                            &mut in_send,
-                            |p|{SkillRegisterMessage::Close(p)}
-                        ).await
+                    let path = request.get_path();
+                    const BASE_SKILLS_PATH: &str = "vap/skillRegistry/skills/";
+                    if path.starts_with("vap/skillRegistry/skills/") {
+                        let id = &path[BASE_SKILLS_PATH.len()..];
+
+                        match read_payload(&request.message.payload, request.response) {
+                            Ok::<(MsgSkillClose, _), _>((p, resp)) => {
+                                if current_skills.lock().unwrap().contains_key(id) {
+                                    let (sender, receiver) = oneshot::channel();
+                                    in_send.send((SkillRegisterMessage::Close(p), sender)).await.unwrap();
+                                    wait_response(receiver, resp, |_|{}).await
+                                }
+                                else {
+                                    respond(resp, ResponseType::BadRequest, vec![])
+                                }
+                            }
+                            Err(r) => {
+                                r
+                            }
+                        }
                     }
                     else {
                         response_not_found(request.response)
@@ -386,8 +423,14 @@ impl SkillRegister {
 
         let mut server = Server::new(&self.ip_address).unwrap();
         server.enable_all_coap(0);
-        server.run( |request| {    
-            perform(request, self.in_send.clone(), &self.pending_requests, &self.pending_can_you)
+        server.run(|request| {    
+            perform(
+                request,
+                self.in_send.clone(),
+                &self.pending_requests,
+                &self.pending_can_you,
+                self.current_skills.clone()
+            )
         }).await.unwrap();
         Ok(())
     }

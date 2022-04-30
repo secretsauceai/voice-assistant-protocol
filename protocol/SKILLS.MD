@@ -123,7 +123,6 @@ The server is asking "Can you answer this request?" When multiple skills are cap
         * <capability data>
 
 *DELETE* **Server/vap/skillRegistry/{skill_system_id}** (Confirmable: Mandatory, Skill -> Registry)
- * skillId: (The one like org.company.product)
 
 **Answer**:
 * Either:
