@@ -66,6 +66,7 @@ After that send:
             * prompt: Optional\<String> -> If required and not present the slot will be asked with this.
             * reprompt: Optional\<String> -> If prompt failed try with this one.
     * entities: [] ->
+        * name: String
         * strict: bool (default: false) -> If true only the words in the list will be accepted
         * data:
             * value: String

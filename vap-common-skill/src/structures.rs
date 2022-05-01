@@ -67,6 +67,7 @@ pub mod msg_register_intents {
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
     pub struct NluDataEntity {
+        pub name: String,
         pub strict: bool,
         pub data: Vec<NluDataEntityData>
     }
