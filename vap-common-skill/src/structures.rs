@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash, fmt::Display};
 
 use serde::{Deserialize, Serialize};
 
@@ -276,5 +276,92 @@ pub struct PlainCapability {
     pub name: String,
 
     #[serde(flatten)]
-    pub cap_data: HashMap<String, String> // TODO: Make this some kind of value thing
+    pub cap_data: HashMap<String, Value>
+}
+
+pub type AssociativeMap = HashMap<Value, Value>;
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(untagged)] 
+pub enum Value {
+    Nil,
+    Bool(bool),
+    I8(i8),
+    U8(u8),
+    I16(i16),
+    U16(u16),
+    I32(i32),
+    U32(u32),
+    I64(i64),
+    U64(u64),
+    F32(f32),
+    F64(f64),
+    String(String),
+    Binary(Vec<u8>),
+    Array(Vec<Value>),
+    Map(HashMap<Value, Value>),
+    // Timestamp // TODO! Finish this type
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Bool(l0), Self::Bool(r0)) => l0 == r0,
+            (Self::I8(l0), Self::I8(r0)) => l0 == r0,
+            (Self::U8(l0), Self::U8(r0)) => l0 == r0,
+            (Self::I16(l0), Self::I16(r0)) => l0 == r0,
+            (Self::U16(l0), Self::U16(r0)) => l0 == r0,
+            (Self::I32(l0), Self::I32(r0)) => l0 == r0,
+            (Self::U32(l0), Self::U32(r0)) => l0 == r0,
+            (Self::I64(l0), Self::I64(r0)) => l0 == r0,
+            (Self::U64(l0), Self::U64(r0)) => l0 == r0,
+            (Self::F32(l0), Self::F32(r0)) => (l0 - r0) < std::f32::EPSILON,
+            (Self::F64(l0), Self::F64(r0)) => (l0 - r0) < std::f64::EPSILON,
+            (Self::String(l0), Self::String(r0)) => l0 == r0,
+            (Self::Binary(l0), Self::Binary(r0)) => l0 == r0,
+            (Self::Array(l0), Self::Array(r0)) => l0 == r0,
+            (Self::Map(l0), Self::Map(r0)) => l0 == r0,
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
+}
+
+impl Hash for Value {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+    }
+}
+
+impl Eq for Value {
+}
+
+impl Display for Value {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fn vec_to_string<D: Display>(v: &[D]) -> String {
+            v.iter().map(|v|v.to_string()).collect::<Vec<String>>().join(", ")
+        }
+
+        fn map_to_string<D1: Display, D2: Display>(m: &HashMap<D1, D2>) -> String {
+            m.iter().map(|(k, v)| format!("{}: {}", k, v)).collect::<Vec<String>>().join(", ")
+        }
+
+        match self {
+            Value::Nil => fmt.write_str("Nil"),
+            Value::Bool(b) => fmt.write_str(&b.to_string()),
+            Value::I8(i) => fmt.write_str(&i.to_string()),
+            Value::U8(u) => fmt.write_str(&u.to_string()),
+            Value::I16(i) => fmt.write_str(&i.to_string()),
+            Value::U16(u) => fmt.write_str(&u.to_string()),
+            Value::I32(i) => fmt.write_str(&i.to_string()),
+            Value::U32(u) => fmt.write_str(&u.to_string()),
+            Value::I64(i) => fmt.write_str(&i.to_string()),
+            Value::U64(u) => fmt.write_str(&u.to_string()),
+            Value::F32(f) => fmt.write_str(&f.to_string()),
+            Value::F64(f) => fmt.write_str(&f.to_string()),
+            Value::String(str) => fmt.write_str(str),
+            Value::Binary(b) => fmt.write_str(&vec_to_string(b)),
+            Value::Array(a) => fmt.write_str(&vec_to_string(a)),
+            Value::Map(m) => fmt.write_str(&map_to_string(m)),
+        }
+    }
 }
