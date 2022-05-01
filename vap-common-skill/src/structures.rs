@@ -244,8 +244,9 @@ pub struct MsgQueryResponse {
 }
 
 pub mod msg_query_response {
-    use std::collections::HashMap;
     use serde::{Deserialize, Serialize};
+
+    use super::AssociativeMap;
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
     pub struct QueryData {
@@ -260,7 +261,7 @@ pub mod msg_query_response {
         pub code: u16,
 
         #[serde(flatten)]
-        pub data: HashMap<String, String>,
+        pub data: AssociativeMap,
     }
 
 }
@@ -276,7 +277,7 @@ pub struct PlainCapability {
     pub name: String,
 
     #[serde(flatten)]
-    pub cap_data: HashMap<String, Value>
+    pub cap_data: AssociativeMap
 }
 
 pub type AssociativeMap = HashMap<Value, Value>;
@@ -363,5 +364,17 @@ impl Display for Value {
             Value::Array(a) => fmt.write_str(&vec_to_string(a)),
             Value::Map(m) => fmt.write_str(&map_to_string(m)),
         }
+    }
+}
+
+impl From<String> for Value {
+    fn from(s: String) -> Self {
+        Value::String(s)
+    }
+}
+
+impl From<&str> for Value {
+    fn from(s: &str) -> Self {
+        Value::String(s.to_string())
     }
 }

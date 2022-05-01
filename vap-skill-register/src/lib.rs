@@ -16,7 +16,6 @@ use vap_common_skill::structures::{msg_skill_request::{ClientData, RequestData}}
 pub use coap_lite::ResponseType;
 pub use vap_common_skill::structures as structures;
 
-
 type RequestId = u64;
 type SharedPending<D> = Arc<
     Mutex<
@@ -26,6 +25,9 @@ type SharedPending<D> = Arc<
         >
     >
 >;
+
+pub const VAP_VERSION: &str = "Alpha";
+pub const SYSTEM_SELF_ID: &str = "vap.SYSTEM";
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -39,7 +41,6 @@ pub struct Response {
 }
 
 pub struct SkillRegister {
-    name: String,
     ip_address: String,
     in_send: mpsc::Sender<(SkillRegisterMessage, oneshot::Sender<Response>)>,
     pending_requests: SharedPending<(Vec<PlainCapability>, oneshot::Sender<RequestResponse>)>,
@@ -75,7 +76,7 @@ fn respond(resp: Option<CoapResponse>, st: ResponseType, pl: Vec<u8>) -> Option<
 }
 
 impl SkillRegister {
-    pub fn new(name: &str, port: u16) -> Result<(Self, SkillRegisterStream, SkillRegisterOut), Error> {   
+    pub fn new(port: u16) -> Result<(Self, SkillRegisterStream, SkillRegisterOut), Error> {   
         let (in_send, in_recv) = mpsc::channel(20);
         let ip_address = format!("127.0.0.1:{}", port);
         let client = CoAPClient::new(&ip_address).unwrap();
@@ -83,7 +84,6 @@ impl SkillRegister {
         let pending_can_you = Arc::new(Mutex::new(HashMap::new()));
         Ok((
             SkillRegister {
-                name: name.to_string(),
                 ip_address: format!("127.0.0.1:{}", port),
                 in_send,
                 pending_requests: pending_requests.clone(),
@@ -220,7 +220,7 @@ impl SkillRegister {
                         "vap/skillRegistry/connect" => {
                             match read_payload(&request.message.payload, request.response) {
                                 Ok::<(MsgConnect,_),_>((p, resp)) => {
-                                    if !current_skills.lock().unwrap().contains_key(&p.id) {
+                                    if !current_skills.lock().unwrap().contains_key(&p.id) && p.vap_version == VAP_VERSION {
                                         let (sender, receiver) = oneshot::channel();
                                         let skill_id = p.id.clone();
                                         in_send.send((SkillRegisterMessage::Connect(p), sender)).await.unwrap();

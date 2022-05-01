@@ -170,7 +170,7 @@ class VapClient():
         payload = {
             "skillId": skill_id,
             "data":[{
-                "clientId": "123456789a",
+                "clientId": "vap.SYSTEM",
                 "capabilities": [{
                     "name": "preferences",
                     "what": "color"

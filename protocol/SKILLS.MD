@@ -161,6 +161,8 @@ The server is asking "Can you answer this request?" When multiple skills are cap
     * type == "canYouAnswer" -> Sent as a response to a canYouAnswer
     * confidence: float
 
+ If clientId is "vap.SYSTEM" then the notification is geared towards the assistant core itself.
+
  A notification is a message started by a skill. Sometimes a skill needs to send
  information on it's own, not as an answer to something the user asked, whether
  it's a stream of sound or whether is just an alarm. Note that the server can
@@ -211,5 +213,7 @@ The server is asking "Can you answer this request?" When multiple skills are cap
 
         * code: 401 Unauthorized -> Skill has not permission for this capability
  
+If clientId is "vap.SYSTEM" then the query is geared towards the assistant core itself.
+
 Retrieve data from the server. The data is selected by the capabilities *Note:* Are those capabilities only implemented by the server or can the clients receive/send any info?
 
