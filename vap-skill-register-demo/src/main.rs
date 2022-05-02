@@ -6,7 +6,7 @@ use vap_skill_register::{
     structures::{
         MsgConnectResponse, Language, MsgQueryResponse, MsgSkillRequest,
         msg_skill_request::{ClientData, RequestData, RequestDataKind},
-        msg_query_response::{QueryData, QueryDataCapability},
+        msg_query_response::{QueryData, QueryDataCapability}, Value,
     }
 };
 
@@ -55,10 +55,10 @@ impl MyData {
                         let capabilities = x.capabilities.into_iter().map(|x| {
                             let (code, payload) = match x.name.as_str() {
                                 "preferences" => {
-                                    if let Some(what) =  x.cap_data.get("what") {
-                                        if what == "color" {
+                                    if let Some(what) =  x.cap_data.get(&"what".into()) {
+                                        if what == &Value::String("color".into()) {
                                             let mut res = HashMap::new();
-                                            res.insert("color".to_string(), "red".to_string());
+                                            res.insert("color".into(), "red".into());
                                             (205, res)
                                         }
                                         else {
@@ -137,7 +137,7 @@ impl MyData {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    let (reg, stream, out) = SkillRegister::new("test-skill-register", conf::PORT).unwrap();
+    let (reg, stream, out) = SkillRegister::new(conf::PORT).unwrap();
     let m = MyData {out};
     let mut request_timer = tokio::time::interval(tokio::time::Duration::from_secs(10));
 
