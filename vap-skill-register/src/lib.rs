@@ -1,3 +1,5 @@
+//! The reference implementation of the VAP skill register.
+
 use std::cell::RefCell;
 use std::{io::Cursor, collections::HashMap};
 use std::net::SocketAddr;
@@ -26,7 +28,9 @@ type SharedPending<D> = Arc<
     >
 >;
 
+/// VAP version implemented by this crate
 pub const VAP_VERSION: &str = "Alpha";
+/// The name used to refer to the skill register itself
 pub const SYSTEM_SELF_ID: &str = "vap.SYSTEM";
 
 #[derive(Debug, Error)]
@@ -35,11 +39,14 @@ pub enum Error {
     ClosedChannel
 }
 
+
 pub struct Response {
     pub status: ResponseType,
     pub payload: Vec<u8>,
 }
 
+/// Will handle incoming and outgoing messages to and from the skills, also
+/// keeps account of the skills registered on the system.
 pub struct SkillRegister {
     ip_address: String,
     in_send: mpsc::Sender<(SkillRegisterMessage, oneshot::Sender<Response>)>,
@@ -48,17 +55,20 @@ pub struct SkillRegister {
     current_skills: Arc<SyncMutex<HashMap<String, ()>>>
 }
 
+/// A notification received from a skill, can contain data for different VAP clients
 pub struct Notification {
     pub skill_id: String,
     pub data: Vec<NotificationData>
 }
 
+/// A message from a VAP skill to a VAP client
 #[derive(Debug, Clone)]
 pub struct NotificationData {
     pub client_id: String,
     pub capabilities: Vec<structures::PlainCapability>
 }
 
+/// A message received from a skill
 pub enum SkillRegisterMessage {
     Connect(MsgConnect),
     RegisterIntents(MsgRegisterIntents),
@@ -76,6 +86,13 @@ fn respond(resp: Option<CoapResponse>, st: ResponseType, pl: Vec<u8>) -> Option<
 }
 
 impl SkillRegister {
+    
+    /// Creates a new skill register, the skill register is divided into three parts:
+    /// 1. The skill register task, which will handle everything behind the scenes, you just need to await on run().
+    /// 2. The skill stream, which will receive all the messages from the skills.
+    /// 3. The skill out, which you can use to send messages to the skills.
+    /// # Arguments
+    /// * `port` - The port for the skill register to listen CoAP messages on.    
     pub fn new(port: u16) -> Result<(Self, SkillRegisterStream, SkillRegisterOut), Error> {   
         let (in_send, in_recv) = mpsc::channel(20);
         let ip_address = format!("127.0.0.1:{}", port);
@@ -99,7 +116,10 @@ impl SkillRegister {
                 pending_can_you, next_request: RefCell::new(0)}
         ))
     }
-
+ 
+    /// Call this function and await it for the rest of the program, this handles
+    /// sending and receiving messages from the skills. Stopping this means no more
+    /// communication, and even dropped channels.
     pub async fn run(self) -> Result<(), Error>  {
         async fn perform(
             request: CoapRequest<SocketAddr>,
@@ -436,17 +456,22 @@ impl SkillRegister {
     }
 }
 
+/// Whether a notification could be handled or some problem arised
 #[derive(Debug, Clone)]
 pub struct NotificationResponse {
     pub client_id: String,
-    pub code: u16
+    /// Response code of the request. Use coap codes (e.g: 200 for success, 404 for not found)
+    pub code: u16 
 }
 
+/// Whether a notification could be handled or some problem arised
 #[derive(Debug, Clone)]
 pub struct RequestResponse {
-    pub code: u16
+    /// Use coap codes (e.g: 200 for success, 404 for not found)
+    pub code: u16 
 }
 
+/// An object for sending messages to skills
 pub struct SkillRegisterOut {
     client: CoAPClient,
     pending_requests: SharedPending<(Vec<PlainCapability>, oneshot::Sender<RequestResponse>)>,
@@ -455,6 +480,7 @@ pub struct SkillRegisterOut {
 }
 
 impl SkillRegisterOut {
+    /// Returns how confident skills registered for some request are in being able to handle it
     pub async fn skills_answerable(&self, ids: &[String], request: RequestData, client: ClientData) -> Vec<MsgNotification> {
         // TODO: Respond to the notification
         async fn send_msg(
@@ -507,8 +533,10 @@ impl SkillRegisterOut {
         id
     }
 
+    /// Sends a request to a skill
     pub async fn activate_skill(&self, name: String, mut msg: MsgSkillRequest) -> Result<(Vec<PlainCapability>, oneshot::Sender<RequestResponse>), Error> {
         // TODO: Respond to the notification
+        
         let req_id = self.get_id();
         msg.request_id = req_id;
         let (sender,receiver) = oneshot::channel();
@@ -524,11 +552,19 @@ impl SkillRegisterOut {
     }
 }
 
+/// An object that will receive notifications from skills
 pub struct SkillRegisterStream {
     stream_in: mpsc::Receiver<(SkillRegisterMessage, oneshot::Sender<Response>)>,
 }
 
 impl SkillRegisterStream {
+    /// Await this on a loop to get notifications from skills
+    /// # Examples
+    /// ```
+    /// loop {
+    ///
+    /// }
+    ///```
     pub async fn recv(&mut self) -> Result<(SkillRegisterMessage, oneshot::Sender<Response>), Error> {
         Ok(self.stream_in.next().await.unwrap())
     }

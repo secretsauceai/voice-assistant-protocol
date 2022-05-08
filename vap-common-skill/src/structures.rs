@@ -2,6 +2,7 @@ use std::{collections::HashMap, hash::Hash, fmt::Display};
 
 use serde::{Deserialize, Serialize};
 
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgConnect {
     /// A skill id in the form of org.organization.skill
@@ -272,6 +273,7 @@ pub struct MsgSkillClose {
     pub skill_id: String,
 }
 
+/// A structure describing Capability data
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PlainCapability {
     pub name: String,
@@ -282,6 +284,7 @@ pub struct PlainCapability {
 
 pub type AssociativeMap = HashMap<Value, Value>;
 
+/// Used as variant for the capabilities data. Represents all types in MsgPack
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(untagged)] 
 pub enum Value {
@@ -304,6 +307,9 @@ pub enum Value {
     // Timestamp // TODO! Finish this type
 }
 
+
+/// PartialEq implementation. For floating point instead of direct equality, we
+/// we make sure they are close enough (because of how computers treat decimals).
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -316,7 +322,7 @@ impl PartialEq for Value {
             (Self::U32(l0), Self::U32(r0)) => l0 == r0,
             (Self::I64(l0), Self::I64(r0)) => l0 == r0,
             (Self::U64(l0), Self::U64(r0)) => l0 == r0,
-            (Self::F32(l0), Self::F32(r0)) => (l0 - r0) < std::f32::EPSILON,
+            (Self::F32(l0), Self::F32(r0)) => (l0 - r0) < std::f32::EPSILON, 
             (Self::F64(l0), Self::F64(r0)) => (l0 - r0) < std::f64::EPSILON,
             (Self::String(l0), Self::String(r0)) => l0 == r0,
             (Self::Binary(l0), Self::Binary(r0)) => l0 == r0,
