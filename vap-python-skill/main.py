@@ -46,7 +46,7 @@ class VapClient():
         payload = {
             "name": "My test skill",
             "id": skill_id,
-            "vapVersion": "1.0.0",
+            "vapVersion": "Alpha",
             "uniqueAuthenticationToken": "",
         }
 
@@ -131,8 +131,7 @@ class VapClient():
     async def close(self):
         # We have finished, let it know to the server
 
-        payload = {"skillId": skill_id}
-        request = aiocoap.Message(code=aiocoap.DELETE, payload=msgpack.packb(payload), uri=f'coap://{registry_address}/vap/skillRegistry/skills/{skill_id}')
+        request = aiocoap.Message(code=aiocoap.DELETE, uri=f'coap://{registry_address}/vap/skillRegistry/skills/{skill_id}')
 
         # Send it  to the registry and wait for a response
         response = await self.client.request(request).response
@@ -204,8 +203,7 @@ class VapClient():
         print(f"Preferred color: {color}")
 
     async def register(self):
-        skill_id = "test_skill"
-
+        print(skill_id)
         message = aiocoap.Message(
             code=aiocoap.GET,
             observe=9999999999999,
@@ -214,7 +212,7 @@ class VapClient():
 
         request = self.client.request(message)
         
-
+        print("Waiting for request...")
         async for r in request.observation:
             print("Got request from registry: ")
             payload = msgpack.unpackb(r.payload)
@@ -235,6 +233,9 @@ client = VapClient()
 async def main():
     """Main entry point for the skill."""
 
+    # Run forever
+    wait = asyncio.get_running_loop().create_future()
+
     # CoAP client initialization
     await client._init()
 
@@ -248,8 +249,7 @@ async def main():
 
     await client.register()
 
-    # Run forever
-    await asyncio.get_running_loop().create_future()
+    await wait
 
     # If by wathever reason we have to shutdown call this
     await client.close()

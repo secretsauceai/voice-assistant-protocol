@@ -1,6 +1,9 @@
 //! The reference implementation of the VAP skill register.
 
+mod queueline;
+
 use std::cell::RefCell;
+use std::thread;
 use std::{io::Cursor, collections::HashMap};
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex as SyncMutex};
@@ -9,9 +12,11 @@ use coap_lite::{RequestType as Method, CoapRequest, CoapResponse};
 use coap::{CoAPClient, Server};
 use futures::future::{join, join_all};
 use futures::{channel::{mpsc, oneshot}, StreamExt, SinkExt, lock::Mutex};
+use queueline::QueueLine;
 use rmp_serde::{from_read, to_vec_named};
 use serde::de::DeserializeOwned;
 use thiserror::Error;
+use tokio::runtime::Runtime;
 use vap_common_skill::structures::*;
 use vap_common_skill::structures::{msg_skill_request::{ClientData, RequestData}};
 
@@ -52,7 +57,9 @@ pub struct SkillRegister {
     in_send: mpsc::Sender<(SkillRegisterMessage, oneshot::Sender<Response>)>,
     pending_requests: SharedPending<(Vec<PlainCapability>, oneshot::Sender<RequestResponse>)>,
     pending_can_you: SharedPending<f32>,
-    current_skills: Arc<SyncMutex<HashMap<String, ()>>>
+    current_skills: Arc<SyncMutex<HashMap<String, ()>>>,
+    barrier: QueueLine,
+    _clnt_thrd: thread::JoinHandle<()>,
 }
 
 /// A notification received from a skill, can contain data for different VAP clients
@@ -95,24 +102,43 @@ impl SkillRegister {
     /// * `port` - The port for the skill register to listen CoAP messages on.    
     pub fn new(port: u16) -> Result<(Self, SkillRegisterStream, SkillRegisterOut), Error> {   
         let (in_send, in_recv) = mpsc::channel(20);
-        let ip_address = format!("127.0.0.1:{}", port);
-        let client = CoAPClient::new(&ip_address).unwrap();
         let pending_requests = Arc::new(Mutex::new(HashMap::new()));
         let pending_can_you = Arc::new(Mutex::new(HashMap::new()));
+        let barrier = QueueLine::new();
+
+        let (self_send, mut self_recv) = mpsc::channel(20);
+        let barrier2 = barrier.clone();
+        let _clnt_thrd = thread::spawn(move || {
+            // In Linux we need a second thread to send 
+            Runtime::new().unwrap().block_on(async move {
+                let ip_address = format!("127.0.0.1:{}", port);
+                let client = CoAPClient::new(&ip_address).unwrap();
+                barrier2.wait().await; // Make sure we are not sending anything before the server is ready
+
+                loop {
+                    let (name, data): (String, _) = self_recv.next().await.unwrap();
+                    let resp = client.request_path(&format!("vap/skillRegistry/skills/{}", name), Method::Put, Some(data), None).unwrap();
+                    assert_eq!(resp.get_status(), &coap_lite::ResponseType::Valid);
+                }
+            });
+        });
+
         Ok((
             SkillRegister {
                 ip_address: format!("127.0.0.1:{}", port),
                 in_send,
                 pending_requests: pending_requests.clone(),
                 pending_can_you: pending_can_you.clone(),
-                current_skills: Arc::new(SyncMutex::new(HashMap::new()))
+                current_skills: Arc::new(SyncMutex::new(HashMap::new())),
+                barrier,
+                _clnt_thrd
             },
 
             SkillRegisterStream {
                 stream_in: in_recv,
             },
 
-            SkillRegisterOut {client, pending_requests, 
+            SkillRegisterOut {pending_requests, self_send,
                 pending_can_you, next_request: RefCell::new(0)}
         ))
     }
@@ -215,7 +241,7 @@ impl SkillRegister {
                                     request,
                                     &mut in_send,
                                     |p: &MsgQuery|current_skills.lock().unwrap().contains_key(&p.skill_id),
-                                    |p|{SkillRegisterMessage::Query(p)}
+                                    SkillRegisterMessage::Query
                                 ).await
                             }
 
@@ -246,10 +272,16 @@ impl SkillRegister {
                                         in_send.send((SkillRegisterMessage::Connect(p), sender)).await.unwrap();
                                         
                                         wait_response(receiver, resp, |r| {
-                                            let code = r.status as u16;
                                             // If it is regarded as "OK"
-                                            if (200..=299).contains(&code) {
-                                                current_skills.lock().unwrap().insert(skill_id,());
+                                            if [
+                                                ResponseType::Created,ResponseType::Deleted,
+                                                ResponseType::Valid,
+                                                ResponseType::Changed,
+                                                ResponseType::Content,
+                                                ResponseType::Continue
+                                                ].contains(&r.status) {
+                                                
+                                                current_skills.lock().unwrap().insert(skill_id.clone(),());
                                             }
                                         }).await
                                     }
@@ -268,7 +300,7 @@ impl SkillRegister {
                                 request,
                                 &mut in_send,
                                 |p: &MsgRegisterIntents|current_skills.lock().unwrap().contains_key(&p.skill_id),
-                                |p|{SkillRegisterMessage::RegisterIntents(p)}
+                                SkillRegisterMessage::RegisterIntents
                             ).await
                         }
 
@@ -443,6 +475,13 @@ impl SkillRegister {
 
         let mut server = Server::new(&self.ip_address).unwrap();
         server.enable_all_coap(0);
+
+        // The server is ready, we can start to send requests to itself
+        // This is added because of an issue with the client trying to acces the
+        // server too soon on Linux. Maybe the underlying library could be fixed
+        // instead of using this.
+        println!("Opened");
+        self.barrier.open(); 
         server.run(|request| {    
             perform(
                 request,
@@ -473,30 +512,27 @@ pub struct RequestResponse {
 
 /// An object for sending messages to skills
 pub struct SkillRegisterOut {
-    client: CoAPClient,
     pending_requests: SharedPending<(Vec<PlainCapability>, oneshot::Sender<RequestResponse>)>,
     pending_can_you: SharedPending<f32>,
-    next_request: RefCell<RequestId>
+    next_request: RefCell<RequestId>,
+    self_send: mpsc::Sender<(String, Vec<u8>)>,
 }
 
 impl SkillRegisterOut {
     /// Returns how confident skills registered for some request are in being able to handle it
-    pub async fn skills_answerable(&self, ids: &[String], request: RequestData, client: ClientData) -> Vec<MsgNotification> {
+    pub async fn skills_answerable(&mut self, ids: &[String], request: RequestData, client: ClientData) -> Vec<MsgNotification> {
         // TODO: Respond to the notification
         async fn send_msg(
-            coap_self: &CoAPClient,
+            self_send: &mut mpsc::Sender<(String, Vec<u8>)>,
             id: &str,
             request: RequestData,
             request_id: RequestId,
             client: ClientData,
-            pending_can_you: &SharedPending<f32>,
+            pending_can_you: &SharedPending<f32>
         ) -> Result<MsgNotification, Error> {
             let msg = MsgSkillRequest {client, request_id, request};
             let data = rmp_serde::to_vec(&msg).unwrap();
-            let path = format!("vap/skillRegistry/skills/{}", id);
-            let resp = coap_self.request_path(&path, Method::Get, Some(data), None).unwrap();
-            
-            assert_eq!(resp.get_status(), &coap_lite::ResponseType::Valid);
+            self_send.send((id.into(), data)).await.unwrap();
 
             let (sender, receiver) = oneshot::channel();
             pending_can_you.lock().await.insert(request_id, sender);
@@ -509,8 +545,9 @@ impl SkillRegisterOut {
         }
 
         let mut answers = Vec::new();
+        let new_id = self.get_id();
         for id in ids {
-            match send_msg(&self.client, id, request.clone(), self.get_id(), client.clone(), &self.pending_can_you).await {
+            match send_msg(&mut self.self_send, id, request.clone(), new_id, client.clone(), &self.pending_can_you).await {
                 Ok(resp) => {
                     println!("{:?}", resp);
                     answers.push(resp);
@@ -534,19 +571,16 @@ impl SkillRegisterOut {
     }
 
     /// Sends a request to a skill
-    pub async fn activate_skill(&self, name: String, mut msg: MsgSkillRequest) -> Result<(Vec<PlainCapability>, oneshot::Sender<RequestResponse>), Error> {
+    pub async fn activate_skill(&mut self, name: String, mut msg: MsgSkillRequest) -> Result<(Vec<PlainCapability>, oneshot::Sender<RequestResponse>), Error> {
         // TODO: Respond to the notification
-        
         let req_id = self.get_id();
         msg.request_id = req_id;
         let (sender,receiver) = oneshot::channel();
         let data = rmp_serde::to_vec(&msg).unwrap();
+        self.self_send.send((name, data)).await.unwrap();
 
         self.pending_requests.lock().await.insert(req_id, sender);
-
-        let resp = self.client.request_path(&format!("vap/skillRegistry/skills/{}", name), Method::Put, Some(data), None).unwrap();
-        assert_eq!(resp.get_status(), &coap_lite::ResponseType::Content);
-
+        
         let resp_data = receiver.await.unwrap();
         Ok(resp_data)
     }

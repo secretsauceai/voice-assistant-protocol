@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
+use tokio::sync::oneshot;
 use vap_skill_register::{
     SkillRegister, Response, ResponseType, SkillRegisterStream, SkillRegisterOut,
     SkillRegisterMessage,
@@ -16,16 +17,17 @@ mod conf {
 }
 
 struct MyData {
-    out: SkillRegisterOut
+    name: Option<oneshot::Sender<String>>
 }
 
 impl MyData {
-    async fn on_msg(&self, mut stream: SkillRegisterStream) -> Result<(), vap_skill_register::Error> {
+    async fn on_msg(&mut self, mut stream: SkillRegisterStream) -> Result<(), vap_skill_register::Error> {
         loop {
             let (msg, responder) = stream.recv().await?;
             let resp = match msg {
                 SkillRegisterMessage::Connect(m) => {
                     println!("{} wants to connect", m.id);
+                    self.name.take().map(|c|c.send(m.id).unwrap());
                     let data= rmp_serde::to_vec(&MsgConnectResponse {
                         unique_authentication_token: None,
                         langs: vec![
@@ -116,9 +118,13 @@ impl MyData {
             responder.send(resp).map_err(|_| vap_skill_register::Error::ClosedChannel)?;
         }
     }
-
-    async fn send_request(&self) {
-        self.out.activate_skill("com.example.test".into(), MsgSkillRequest {
+}
+pub struct MyDataOut{
+    out: SkillRegisterOut
+}
+impl MyDataOut {
+    async fn send_request(&mut self, name: String) {
+        self.out.activate_skill(name, MsgSkillRequest {
             request_id: 0, // Will be filled by the registry
             client: ClientData {
                 system_id: "test-client".into(),
@@ -138,14 +144,20 @@ impl MyData {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let (reg, stream, out) = SkillRegister::new(conf::PORT).unwrap();
-    let m = MyData {out};
+    let (send_name, recv_name) = oneshot::channel();
+    let mut m = MyData {name: Some(send_name)};
+    let mut m_out = MyDataOut{out};
     let mut request_timer = tokio::time::interval(tokio::time::Duration::from_secs(10));
 
-    let send_requests = async {
+    let send_requests = async move {
+        let name = recv_name.await.unwrap();
+
+        // Wait for client to be fully ready
+        tokio::time::sleep(Duration::from_secs(1)).await;
         loop {
             request_timer.tick().await;
-            println!("Sending request");
-            m.send_request().await;
+            println!("Sending request to: {}", name);
+            m_out.send_request(name.clone()).await;
         }
     };
 
