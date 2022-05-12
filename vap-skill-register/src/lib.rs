@@ -1,18 +1,15 @@
 //! The reference implementation of the VAP skill register.
 
-mod queueline;
-
 use std::cell::RefCell;
 use std::thread;
 use std::{io::Cursor, collections::HashMap};
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex as SyncMutex};
+use std::sync::{Arc, Mutex as SyncMutex, Barrier};
 
 use coap_lite::{RequestType as Method, CoapRequest, CoapResponse};
 use coap::{CoAPClient, Server};
 use futures::future::{join, join_all};
 use futures::{channel::{mpsc, oneshot}, StreamExt, SinkExt, lock::Mutex};
-use queueline::QueueLine;
 use rmp_serde::{from_read, to_vec_named};
 use serde::de::DeserializeOwned;
 use thiserror::Error;
@@ -58,7 +55,7 @@ pub struct SkillRegister {
     pending_requests: SharedPending<(Vec<PlainCapability>, oneshot::Sender<RequestResponse>)>,
     pending_can_you: SharedPending<f32>,
     current_skills: Arc<SyncMutex<HashMap<String, ()>>>,
-    barrier: QueueLine,
+    barrier: Arc<Barrier>,
     _clnt_thrd: thread::JoinHandle<()>,
 }
 
@@ -104,16 +101,18 @@ impl SkillRegister {
         let (in_send, in_recv) = mpsc::channel(20);
         let pending_requests = Arc::new(Mutex::new(HashMap::new()));
         let pending_can_you = Arc::new(Mutex::new(HashMap::new()));
-        let barrier = QueueLine::new();
+        let barrier = Arc::new(Barrier::new(2));
 
         let (self_send, mut self_recv) = mpsc::channel(20);
         let barrier2 = barrier.clone();
         let _clnt_thrd = thread::spawn(move || {
-            // In Linux we need a second thread to send 
+            // In Linux we need a second thread to to send to ourselves, otherwise
+            // what would be a non-blocking operation, tries to block, which
+            // returns an error.
             Runtime::new().unwrap().block_on(async move {
                 let ip_address = format!("127.0.0.1:{}", port);
                 let client = CoAPClient::new(&ip_address).unwrap();
-                barrier2.wait().await; // Make sure we are not sending anything before the server is ready
+                barrier2.wait(); // Make sure we are not sending anything before the server is ready
 
                 loop {
                     let (name, data): (String, _) = self_recv.next().await.unwrap();
@@ -478,10 +477,8 @@ impl SkillRegister {
 
         // The server is ready, we can start to send requests to itself
         // This is added because of an issue with the client trying to acces the
-        // server too soon on Linux. Maybe the underlying library could be fixed
-        // instead of using this.
-        println!("Opened");
-        self.barrier.open(); 
+        // server too soon on Linux.
+        self.barrier.wait(); 
         server.run(|request| {    
             perform(
                 request,
