@@ -206,7 +206,7 @@ class VapClient():
         print(skill_id)
         message = aiocoap.Message(
             code=aiocoap.GET,
-            observe=9999999999999,
+            observe=0,
             uri=f'coap://{registry_address}/vap/skillRegistry/skills/{skill_id}'
         )
 

@@ -9,8 +9,8 @@ edition = "2018"
 vap-common-skill = {path = "../vap-common-skill"}
 tokio = {version = "^1.15", features = ["macros", "time"] }
 futures = "^0.3"
-coap = "^0.11"
-coap-lite = "^0.7"
+coap = {git = "https://github.com/Covertness/coap-rs"}
+coap-lite = "^0.8"
 rmp = "^0.8"
 rmp-serde = "^0.15"
 thiserror = "^1.0"
