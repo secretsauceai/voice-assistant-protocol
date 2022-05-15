@@ -57,6 +57,7 @@ pub struct SkillRegister {
     current_skills: Arc<SyncMutex<HashMap<String, ()>>>,
     barrier: Arc<Barrier>,
     _clnt_thrd: thread::JoinHandle<()>,
+    self_send: mpsc::Sender<(String, Vec<u8>)>,
 }
 
 /// A notification received from a skill, can contain data for different VAP clients
@@ -130,7 +131,8 @@ impl SkillRegister {
                 pending_can_you: pending_can_you.clone(),
                 current_skills: Arc::new(SyncMutex::new(HashMap::new())),
                 barrier,
-                _clnt_thrd
+                _clnt_thrd,
+                self_send: self_send.clone()
             },
 
             SkillRegisterStream {
@@ -151,7 +153,8 @@ impl SkillRegister {
             mut in_send: mpsc::Sender<(SkillRegisterMessage, oneshot::Sender<Response>)>,
             pending_requests: &SharedPending<(Vec<PlainCapability>, oneshot::Sender<RequestResponse>)>,
             pending_can_you: &SharedPending<f32>,
-            current_skills: Arc<SyncMutex<HashMap<String, ()>>>
+            current_skills: Arc<SyncMutex<HashMap<String, ()>>>,
+            mut self_send: mpsc::Sender<(String, Vec<u8>)>
         ) -> Option<CoapResponse> {
             fn read_payload<T: DeserializeOwned>(payload: &[u8], r: Option<CoapResponse>) -> Result<(T, Option<CoapResponse>), Option<CoapResponse>> {
                 match from_read(Cursor::new(payload)) {
@@ -280,6 +283,8 @@ impl SkillRegister {
                                                 ResponseType::Continue
                                                 ].contains(&r.status) {
                                                 
+                                                // We need to register the skill inside the CoAP server
+                                                self_send.try_send((skill_id.clone(), vec![])).unwrap();
                                                 current_skills.lock().unwrap().insert(skill_id.clone(),());
                                             }
                                         }).await
@@ -485,7 +490,8 @@ impl SkillRegister {
                 self.in_send.clone(),
                 &self.pending_requests,
                 &self.pending_can_you,
-                self.current_skills.clone()
+                self.current_skills.clone(),
+                self.self_send.clone()
             )
         }).await.unwrap();
         Ok(())
@@ -593,7 +599,7 @@ impl SkillRegisterStream {
     /// # Examples
     /// ```
     /// loop {
-    ///
+    ///     let (msg, response) = skill_register_stream.recv().await.unwrap();
     /// }
     ///```
     pub async fn recv(&mut self) -> Result<(SkillRegisterMessage, oneshot::Sender<Response>), Error> {

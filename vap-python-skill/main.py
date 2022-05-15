@@ -215,7 +215,7 @@ class VapClient():
         print("Waiting for request...")
         async for r in request.observation:
             print("Got request from registry: ")
-            payload = msgpack.unpackb(r.payload)
+            payload = msgpack.unpackb(r.payload, strict_map_key=False)
             print(payload)
             request_id = 1
             type_id = 0
