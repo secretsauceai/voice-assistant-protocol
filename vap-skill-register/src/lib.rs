@@ -322,8 +322,8 @@ impl SkillRegister {
 
                                     let skill_id = msg.skill_id;
 
-                                    for a in msg.data {
-                                        match a {
+                                    for d in msg.data {
+                                        match d {
                                             msg_notification::Data::CanYouAnswer{request_id, confidence} => {
                                                 fn can_you_answer_done(response: coap_lite::ResponseType, id: RequestId) -> RequestResolution {
                                                     RequestResolution::Done(msg_notification_response::Data::CanYouAnswer {
@@ -403,8 +403,9 @@ impl SkillRegister {
 
                                     }
                                     else {
+                                        const DEFAULT_RESP: RequestResponse = RequestResponse{code: ResponseType::Content as u16};
                                         let res = futs.await.into_iter()
-                                            .map(|r|r.unwrap())
+                                            .map(|r|r.unwrap_or(DEFAULT_RESP))
                                             .zip(request_ids)
                                             .map(|(n, request_id)|msg_notification_response::Data::Requested {
                                                 code: n.code,
