@@ -141,12 +141,13 @@ class VapClient():
             raise Exception(f"Failed to disconenct from registry: {response.code}")
 
     async def notification(self):
-        """ Some request started by the skill, right now, the protocol defines
-        no response. """
+        """ Some request started by the skill, if the reception went well we'll
+        have a "CONTENT" code. """
 
         payload = {
             "skillId": skill_id,
             "data":[{
+                "type": "standalone",
                 "clientId": "123456789a",
                 "capabilities": [{
                     "name": "text",
@@ -156,10 +157,13 @@ class VapClient():
         }
 
         # Create request
-        request = aiocoap.Message(code=aiocoap.GET, payload=msgpack.packb(payload), uri=f'coap://{registry_address}/vap/skillRegistry/notification')
+        request = aiocoap.Message(code=aiocoap.POST, payload=msgpack.packb(payload), uri=f'coap://{registry_address}/vap/skillRegistry/notification')
 
         # Send request
-        await self.client.request(request).response
+        response = await self.client.request(request).response
+
+        if response.code != aiocoap.CONTENT:
+            raise Exception(f"Failed to send notification: {response.code}")
 
     async def query(self):
         # Ask something to the system about a certain client or about the system itself.
@@ -202,6 +206,31 @@ class VapClient():
 
         print(f"Preferred color: {color}")
 
+    async def __answer_request(self, requestId):
+        
+
+        payload = {
+            "skillId": skill_id,
+            "data": [{
+                "type": "requested",
+                "requestId": requestId,
+                "capabilities": [{
+                    "name": "text",
+                    "text": "hello there"
+                }]
+            }]
+        }
+
+        # Create request
+        request = aiocoap.Message(code=aiocoap.POST, payload=msgpack.packb(payload), uri=f'coap://{registry_address}/vap/skillRegistry/notification')
+
+        # Send request
+        response = await self.client.request(request).response
+
+        # Check if no error happened
+        if response.code != aiocoap.VALID:
+            raise Exception(f"Failed to disconenct from registry: {response.code}")
+
     async def register(self):
         print(skill_id)
         message = aiocoap.Message(
@@ -214,14 +243,21 @@ class VapClient():
         
         print("Waiting for request...")
         async for r in request.observation:
-            print("Got request from registry: ")
             payload = msgpack.unpackb(r.payload, strict_map_key=False)
-            print(payload)
-            request_id = 1
+            request_id = 2
             type_id = 0
-            request_type = payload[request_id][type_id]
+            request_type = next(iter(payload[request_id][type_id]))
+            canAnswer = 2
+            intent = 0
             if request_type == "canYouAnswer":
-                print("Got a canYouAnswer request")
+                print("Got a canYouAnswer request:")
+            
+            elif request_type == intent:
+                print("Got an intent from registry: ")
+                request_id_id = 0
+                await self.__answer_request(payload[request_id_id])
+
+            print(payload)
             
 
             
