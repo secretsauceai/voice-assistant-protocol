@@ -226,7 +226,7 @@ pub struct MsgQuery {
     pub data: Vec<msg_query::QueryData>,
 }
 
-mod msg_query {
+pub mod msg_query {
     use serde::{Deserialize, Serialize};
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
