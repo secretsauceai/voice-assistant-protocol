@@ -4,8 +4,6 @@
 members = [
     "vap-common",
     "vap-client-register",
-    "vap-client-register-demo",
     "vap-skill-register",
-    "vap-skill-register-demo",
     "vap-skill-framework"
 ]

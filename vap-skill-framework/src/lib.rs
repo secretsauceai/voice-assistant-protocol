@@ -5,7 +5,7 @@ use coap_lite::{RequestType as Method, ResponseType, MessageClass};
 use futures::channel::mpsc;
 use serde::Serialize;
 use unic_langid::LanguageIdentifier;
-use vap_common_skill::structures::{*, msg_register_intents::NluData, msg_notification::Data, msg_query::QueryData, msg_skill_request::{RequestDataKind, RequestData, ClientData}};
+use vap_common_skill::structures::{*, msg_register_intents::NluData, msg_notification::Data, msg_query::QueryData, msg_skill_request::{RequestData, ClientData}};
 
 pub struct Skill {
     client: CoAPClient,

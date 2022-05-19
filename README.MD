@@ -14,15 +14,12 @@ Here you will find:
 
 
 ### Important
-* `vap-client-register-demo`: An example register for clients.
-* `vap-skill-register-demo`: An example register for skills.
-* `vap-skill-framework-demo`: An example VAP skill using `vap-skill-framework`.
+* `vap-skill-register`: The Rust-based skill register itself.
+* `vap-skill-framework`: A library for writing Rust-based skills.
+* `vap-client-register`: The Rust-based client register itself.
 * `vap-python-skill`: An example Python skill. Python.
 
 ### Auxiliary
 * `vap-common-client`: Structures and functions common for the clients themselves and the client registry.
 * `vap-common`: Structures and functions common to both clients and skills.
 * `vap-common-skill`: Structures and functions common for the skill themselves and the skill registry.
-* `vap-client-register`: The Rust-based client register itself.
-* `vap-skill-register`: The Rust-based skill register itself.
-* `vap-skill-framework`: A library for writing Rust-based skills.
