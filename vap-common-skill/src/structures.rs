@@ -1,40 +1,38 @@
-use std::{collections::HashMap, hash::Hash, fmt::Display};
+use std::{collections::HashMap, fmt::Display, hash::Hash};
 
 use serde::{Deserialize, Serialize};
-
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgConnect {
     /// A skill id in the form of org.organization.skill
-    pub id: String, 
+    pub id: String,
 
     /// A human readable name for the skill
-    pub name: String ,
+    pub name: String,
 
-    #[serde(rename="vapVersion")]
+    #[serde(rename = "vapVersion")]
     pub vap_version: String,
 
-    #[serde(rename="uniqueAuthenticationToken")]
-    pub unique_authentication_token: Option<String>
+    #[serde(rename = "uniqueAuthenticationToken")]
+    pub unique_authentication_token: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgConnectResponse {
     /// A list of languages currently in use by the voice assistant
-    pub langs: Vec<Language>, 
+    pub langs: Vec<Language>,
 
-    #[serde(rename="uniqueAuthenticationToken")]
-    pub unique_authentication_token: Option<String>
+    #[serde(rename = "uniqueAuthenticationToken")]
+    pub unique_authentication_token: Option<String>,
 }
-
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgRegisterIntents {
-    #[serde(rename="skillId")]
+    #[serde(rename = "skillId")]
     pub skill_id: String,
 
-    #[serde(rename="nluData")]
-    pub nlu_data: Vec<msg_register_intents::NluData>
+    #[serde(rename = "nluData")]
+    pub nlu_data: Vec<msg_register_intents::NluData>,
 }
 
 pub mod msg_register_intents {
@@ -52,49 +50,49 @@ pub mod msg_register_intents {
     pub struct NluDataIntent {
         pub name: String,
         pub utterances: Vec<NluDataIntentUtterance>,
-        pub slots: Vec<NluDataSlot>
+        pub slots: Vec<NluDataSlot>,
     }
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
     pub struct NluDataIntentUtterance {
-        pub text: String
+        pub text: String,
     }
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
     pub struct NluDataSlot {
         pub name: String,
-        pub entity: String
+        pub entity: String,
     }
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
     pub struct NluDataEntity {
         pub name: String,
         pub strict: bool,
-        pub data: Vec<NluDataEntityData>
+        pub data: Vec<NluDataEntityData>,
     }
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
     pub struct NluDataEntityData {
         pub value: String,
-        pub synonyms: Vec<String>
+        pub synonyms: Vec<String>,
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Language { // Better this or a single string?
+pub struct Language {
+    // Better this or a single string?
     /// The country code of the language
-    pub country: Option<String>, 
+    pub country: Option<String>,
 
     /// The language code
-    pub language: String, 
+    pub language: String,
 
     /// The extra code for the language
     pub extra: Option<String>, // is this necessary?
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct MsgRegisterIntentsResponse {
-}
+pub struct MsgRegisterIntentsResponse {}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgSkillRequest {
@@ -108,7 +106,7 @@ pub mod msg_skill_request {
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
     pub struct ClientData {
-        #[serde(rename="systemId")]
+        #[serde(rename = "systemId")]
         pub system_id: String,
         pub capabilities: Vec<ClientDataCapability>,
     }
@@ -121,19 +119,19 @@ pub mod msg_skill_request {
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
     pub enum RequestDataKind {
-        #[serde(rename="intent")]
+        #[serde(rename = "intent")]
         Intent,
 
-        #[serde(rename="event")]
+        #[serde(rename = "event")]
         Event,
-        
-        #[serde(rename="canAnswer")]
-        CanAnswer
+
+        #[serde(rename = "canAnswer")]
+        CanAnswer,
     }
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
     pub struct RequestData {
-        #[serde(rename="type")]
+        #[serde(rename = "type")]
         pub type_: RequestDataKind,
         pub intent: String,
         pub locale: String,
@@ -149,83 +147,83 @@ pub mod msg_skill_request {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgNotification {
-    #[serde(rename="skillId")]
+    #[serde(rename = "skillId")]
     pub skill_id: String,
 
-    pub data: Vec<msg_notification::Data>
+    pub data: Vec<msg_notification::Data>,
 }
 
 pub mod msg_notification {
     use serde::{Deserialize, Serialize};
-    
+
     #[derive(Clone, Debug, Deserialize, Serialize)]
-    #[serde(tag="type")]
+    #[serde(tag = "type")]
     pub enum Data {
-        #[serde(rename="requested")]
+        #[serde(rename = "requested")]
         Requested {
-            #[serde(rename="requestId")]
+            #[serde(rename = "requestId")]
             request_id: u64,
 
             capabilities: Vec<super::PlainCapability>,
         },
 
-        #[serde(rename="standalone")]
+        #[serde(rename = "standalone")]
         StandAlone {
-            #[serde(rename="clientId")]
+            #[serde(rename = "clientId")]
             client_id: String,
 
-            capabilities: Vec<super::PlainCapability>
+            capabilities: Vec<super::PlainCapability>,
         },
-        
-        #[serde(rename="canYouAnswer")]
+
+        #[serde(rename = "canYouAnswer")]
         CanYouAnswer {
-            #[serde(rename="requestId")]
+            #[serde(rename = "requestId")]
             request_id: u64,
-            
-            confidence: f32
-        }
+
+            confidence: f32,
+        },
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgNotificationResponse {
-    pub data: Vec<msg_notification_response::Data>
+    pub data: Vec<msg_notification_response::Data>,
 }
 
 pub mod msg_notification_response {
     use serde::{Deserialize, Serialize};
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
-    #[serde(tag="type")]
+    #[serde(tag = "type")]
     pub enum Data {
-        #[serde(rename="requested")]
+        #[serde(rename = "requested")]
         Requested {
-            #[serde(rename="requestId")]
+            #[serde(rename = "requestId")]
             request_id: u64,
             code: u16,
         },
 
-        #[serde(rename="standalone")]
+        #[serde(rename = "standalone")]
         StandAlone {
-            #[serde(rename="clientId")]
+            #[serde(rename = "clientId")]
             client_id: String,
             code: u16,
         },
-        
-        #[serde(rename="canYouAnswer")]
+
+        #[serde(rename = "canYouAnswer")]
         CanYouAnswer {
-            #[serde(rename="requestId")]
+            #[serde(rename = "requestId")]
             request_id: u64,
             code: u16,
-        }
+        },
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgQuery {
-    #[serde(rename="skillId")]
+    #[serde(rename = "skillId")]
     pub skill_id: String,
-    pub data: Vec<msg_query::QueryData>
+    pub data: Vec<msg_query::QueryData>,
 }
 
 mod msg_query {
@@ -233,15 +231,15 @@ mod msg_query {
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
     pub struct QueryData {
-        #[serde(rename="clientId")]
+        #[serde(rename = "clientId")]
         pub client_id: String,
-        pub capabilities: Vec<super::PlainCapability>
+        pub capabilities: Vec<super::PlainCapability>,
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgQueryResponse {
-    pub data: Vec<msg_query_response::QueryData>
+    pub data: Vec<msg_query_response::QueryData>,
 }
 
 pub mod msg_query_response {
@@ -251,8 +249,8 @@ pub mod msg_query_response {
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
     pub struct QueryData {
-        #[serde(rename="clientId")]
-        pub client_id : String,
+        #[serde(rename = "clientId")]
+        pub client_id: String,
         pub capabilities: Vec<QueryDataCapability>,
     }
 
@@ -264,12 +262,11 @@ pub mod msg_query_response {
         #[serde(flatten)]
         pub data: AssociativeMap,
     }
-
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgSkillClose {
-    #[serde(rename="skillId")]
+    #[serde(rename = "skillId")]
     pub skill_id: String,
 }
 
@@ -279,14 +276,14 @@ pub struct PlainCapability {
     pub name: String,
 
     #[serde(flatten)]
-    pub cap_data: AssociativeMap
+    pub cap_data: AssociativeMap,
 }
 
 pub type AssociativeMap = HashMap<Value, Value>;
 
 /// Used as variant for the capabilities data. Represents all types in MsgPack
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(untagged)] 
+#[serde(untagged)]
 pub enum Value {
     Nil,
     Bool(bool),
@@ -307,7 +304,6 @@ pub enum Value {
     // Timestamp // TODO! Finish this type
 }
 
-
 /// PartialEq implementation. For floating point instead of direct equality, we
 /// we make sure they are close enough (because of how computers treat decimals).
 impl PartialEq for Value {
@@ -322,7 +318,7 @@ impl PartialEq for Value {
             (Self::U32(l0), Self::U32(r0)) => l0 == r0,
             (Self::I64(l0), Self::I64(r0)) => l0 == r0,
             (Self::U64(l0), Self::U64(r0)) => l0 == r0,
-            (Self::F32(l0), Self::F32(r0)) => (l0 - r0) < std::f32::EPSILON, 
+            (Self::F32(l0), Self::F32(r0)) => (l0 - r0) < std::f32::EPSILON,
             (Self::F64(l0), Self::F64(r0)) => (l0 - r0) < std::f64::EPSILON,
             (Self::String(l0), Self::String(r0)) => l0 == r0,
             (Self::Binary(l0), Self::Binary(r0)) => l0 == r0,
@@ -339,17 +335,22 @@ impl Hash for Value {
     }
 }
 
-impl Eq for Value {
-}
+impl Eq for Value {}
 
 impl Display for Value {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         fn vec_to_string<D: Display>(v: &[D]) -> String {
-            v.iter().map(|v|v.to_string()).collect::<Vec<String>>().join(", ")
+            v.iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<String>>()
+                .join(", ")
         }
 
         fn map_to_string<D1: Display, D2: Display>(m: &HashMap<D1, D2>) -> String {
-            m.iter().map(|(k, v)| format!("{}: {}", k, v)).collect::<Vec<String>>().join(", ")
+            m.iter()
+                .map(|(k, v)| format!("{}: {}", k, v))
+                .collect::<Vec<String>>()
+                .join(", ")
         }
 
         match self {
