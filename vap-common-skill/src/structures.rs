@@ -93,22 +93,22 @@ pub struct Language {
 }
 
 impl From<LanguageIdentifier> for Language {
-    fn from(l: LanguageIdentifier) -> Self {        
+    fn from(l: LanguageIdentifier) -> Self {
         Language {
-            country: l.region.map(|r|r.to_string()),
+            country: l.region.map(|r| r.to_string()),
             language: l.language.to_string(),
-            extra: l.script.map(|s|s.to_string())
+            extra: l.script.map(|s| s.to_string()),
         }
     }
 }
 
-impl From<Language>  for LanguageIdentifier {
+impl From<Language> for LanguageIdentifier {
     fn from(lang: Language) -> Self {
         LanguageIdentifier::from_parts(
             lang.language.parse().unwrap(),
-            lang.extra.and_then(|e|e.parse().ok()),
-            lang.country.and_then(|c|c.parse().ok()),
-            &[]
+            lang.extra.and_then(|e| e.parse().ok()),
+            lang.country.and_then(|c| c.parse().ok()),
+            &[],
         )
     }
 }
@@ -139,7 +139,7 @@ pub mod msg_skill_request {
         pub version: u16,
     }
 
-    #[derive(Clone, Debug, Deserialize, Serialize)]
+    #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
     pub enum RequestDataKind {
         #[serde(rename = "intent")]
         Intent,
