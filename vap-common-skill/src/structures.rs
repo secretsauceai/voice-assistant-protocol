@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fmt::Display, hash::Hash};
 
 use serde::{Deserialize, Serialize};
+use unic_langid::LanguageIdentifier;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgConnect {
@@ -89,6 +90,27 @@ pub struct Language {
 
     /// The extra code for the language
     pub extra: Option<String>, // is this necessary?
+}
+
+impl From<LanguageIdentifier> for Language {
+    fn from(l: LanguageIdentifier) -> Self {        
+        Language {
+            country: l.region.map(|r|r.to_string()),
+            language: l.language.to_string(),
+            extra: l.script.map(|s|s.to_string())
+        }
+    }
+}
+
+impl From<Language>  for LanguageIdentifier {
+    fn from(lang: Language) -> Self {
+        LanguageIdentifier::from_parts(
+            lang.language.parse().unwrap(),
+            lang.extra.and_then(|e|e.parse().ok()),
+            lang.country.and_then(|c|c.parse().ok()),
+            &[]
+        )
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
