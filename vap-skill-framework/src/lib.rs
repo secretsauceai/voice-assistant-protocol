@@ -1,11 +1,14 @@
-use std::io::Cursor;
+mod load;
+
+use std::{io::Cursor, path::Path};
 
 use coap::CoAPClient;
 use coap_lite::{RequestType as Method, ResponseType, MessageClass};
+use fluent_langneg::negotiate_languages;
 use futures::channel::mpsc;
 use serde::Serialize;
 use unic_langid::LanguageIdentifier;
-use vap_common_skill::structures::{*, msg_register_intents::NluData, msg_notification::Data, msg_query::QueryData, msg_skill_request::{RequestData, ClientData}};
+use vap_common_skill::structures::{*, msg_notification::Data, msg_query::QueryData, msg_skill_request::{RequestData, ClientData}};
 
 pub struct Skill {
     client: CoAPClient,
@@ -14,14 +17,6 @@ pub struct Skill {
     sender: mpsc::Sender<RegistryRequest>
 }
 
-fn from_lang_struct(lang: Language) -> LanguageIdentifier {
-    LanguageIdentifier::from_parts(
-        lang.language.parse().unwrap(),
-        lang.extra.and_then(|e|e.parse().ok()),
-        lang.country.and_then(|c|c.parse().ok()),
-        &[]
-    )
-}
 
 impl Skill {
     fn get_address() -> String {
@@ -29,10 +24,11 @@ impl Skill {
         format!("127.0.0.1:{}", PORT)
     }
 
-    pub fn new<S1, S2>(name: S1, id: S2) -> (Self , SkillIn)
+    pub fn new<S1, S2, P>(name: S1, id: S2, intents: P) -> (Self , SkillIn)
         where
         S1: Into<String>,
-        S2: Into<String> {
+        S2: Into<String>,
+        P: AsRef<Path> + Clone {
 
         let id_str = id.into();
         let payload = rmp_serde::to_vec_named(&MsgConnect {
@@ -54,11 +50,10 @@ impl Skill {
             MessageClass::Response(ResponseType::Created) => {
                 let payload: MsgConnectResponse = rmp_serde::from_read(Cursor::new(resp.message.payload)).unwrap();
                 let (sender, receiver) = mpsc::channel(10);
+                let mut skill = Self {client, id: id_str, langs: payload.langs.into_iter().map(|l|l.into()).collect(), sender};
+                skill.register_intents(intents);
                 
-                (
-                    Self {client, id: id_str, langs: payload.langs.into_iter().map(from_lang_struct).collect(), sender},
-                    receiver
-                )
+                (skill, receiver)
             },
             _ => {panic!("ERROR")}
         }        
@@ -85,7 +80,12 @@ impl Skill {
         }
     }
 
-    pub fn register_intents(&mut self, nlu_data: Vec<NluData>) {
+    pub fn register_intents<P>(&mut self, intents: P) where P: AsRef<Path> + Clone {
+        let langs = load::list_langs(intents.clone());
+        let langs = negotiate_languages(&self.langs, &langs, None, fluent_langneg::NegotiationStrategy::Matching);
+
+        let nlu_data = load::load_intents(&langs, intents);
+
         match self.send_message(
             Method::Post,
             "vap/skillRegistry/registerIntents",
@@ -148,9 +148,15 @@ impl Skill {
     }
 }
 
+impl Drop for Skill {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+
 pub struct RegistryRequest {
-    client: ClientData,
-    request: RequestData
+    pub client: ClientData,
+    pub request: RequestData
 }
 
 type SkillIn = mpsc::Receiver<RegistryRequest>;
@@ -161,9 +167,7 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let (mut skill, mut skill_in) = Skill::new("Test", "com.example.test");
-        skill.register_intents(vec![]);
+        let (mut skill, mut skill_in) = Skill::new("Test", "com.example.test", "assets");
         skill.register();
-        skill.close();
     }
 }
