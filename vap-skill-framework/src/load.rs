@@ -13,11 +13,17 @@ use vap_common_skill::structures::{
     Language,
 };
 
-pub fn list_langs<P>(intents: P) -> Vec<LanguageIdentifier> where P: AsRef<Path> {
+pub fn list_langs<P>(intents: P) -> Vec<LanguageIdentifier>
+where
+    P: AsRef<Path>,
+{
     let folder = intents.as_ref();
-    folder.read_dir().unwrap().into_iter().filter_map(|r| {
-        r.unwrap().file_name().to_str().unwrap().parse().ok()
-    }).collect()
+    folder
+        .read_dir()
+        .unwrap()
+        .into_iter()
+        .filter_map(|r| r.unwrap().file_name().to_str().unwrap().parse().ok())
+        .collect()
 }
 
 pub fn load_intents<P>(langs: &[&LanguageIdentifier], intents: P) -> Vec<NluData>
@@ -25,23 +31,27 @@ where
     P: AsRef<Path>,
 {
     let folder = intents.as_ref();
-    folder.read_dir().unwrap().into_iter().filter_map(|r| {
-        let r = r.unwrap();
-        let t = r.file_type().unwrap();
-        if t.is_file() {
-            let i: LanguageIdentifier = r.file_name().to_str().unwrap().parse().unwrap();
+    folder
+        .read_dir()
+        .unwrap()
+        .into_iter()
+        .filter_map(|r| {
+            let r = r.unwrap();
+            let t = r.file_type().unwrap();
+            if t.is_file() {
+                let i: LanguageIdentifier = r.file_name().to_str().unwrap().parse().unwrap();
 
-            if langs.contains(&&i) {
-                let l: LangData = from_str(&fs::read_to_string(r.path()).unwrap()).unwrap();
-                Some(l.into_nlu_data(i.into()))
-            }
-            else {
+                if langs.contains(&&i) {
+                    let l: LangData = from_str(&fs::read_to_string(r.path()).unwrap()).unwrap();
+                    Some(l.into_nlu_data(i.into()))
+                } else {
+                    None
+                }
+            } else {
                 None
             }
-        } else {
-            None
-        }
-    }).collect()
+        })
+        .collect()
 }
 
 type ScopeData = HashMap<String, IntentData>;
