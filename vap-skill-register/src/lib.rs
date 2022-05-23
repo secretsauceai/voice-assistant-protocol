@@ -107,7 +107,8 @@ impl SkillRegister {
                 barrier2.wait(); // Make sure we are not sending anything before the server is ready
 
                 loop {
-                    let (name, data): (String, _) = self_recv.next().await.unwrap();
+                    let (name, data): (String, Vec<u8>) = self_recv.next().await.unwrap();
+                    println!("Size: {}", data.len());
                     let resp = client
                         .request_path(
                             &format!("vap/skillRegistry/skills/{}", name),
@@ -176,7 +177,12 @@ impl SkillRegister {
                 Method::Put =>
                 // Puts are needed so that an observe update is produced
                 {
-                    respond(request.response, coap_lite::ResponseType::Valid, vec![])
+                    if request.get_path().starts_with("vap/skillRegistry/skill") {
+                        respond(request.response, coap_lite::ResponseType::Valid, vec![])
+                    }
+                    else {
+                        respond(request.response, coap_lite::ResponseType::MethodNotAllowed, vec![])
+                    }
                 }
 
                 _ => {
@@ -289,12 +295,12 @@ impl SkillRegisterOut {
             .await
             {
                 Ok(resp) => {
-                    println!("{:?}", resp);
+                    println!("We received the notification: {:?}", resp);
                     answers.push(resp);
                 }
                 Err(e) => {
                     // TODO: What to do with the errors?
-                    println!("{:?}", e);
+                    println!("Error receiving notifications: {:?}", e);
                 }
             }
         }

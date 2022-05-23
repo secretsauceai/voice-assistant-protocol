@@ -8,7 +8,7 @@ use vap_skill_register::{
         Language, MsgConnectResponse, MsgQueryResponse, MsgSkillRequest, Value,
     },
     Response, ResponseType, SkillRegister, SkillRegisterMessage, SkillRegisterOut,
-    SkillRegisterStream,
+    SkillRegisterStream, RequestResponse,
 };
 
 mod conf {
@@ -39,6 +39,7 @@ impl MyData {
                         }],
                     })
                     .unwrap();
+                    
                     Response {
                         status: ResponseType::Created,
                         payload: data,
@@ -134,7 +135,7 @@ pub struct MyDataOut {
 }
 impl MyDataOut {
     async fn send_request(&mut self, name: String) {
-        self.out
+        let (answer, sender) = self.out
             .activate_skill(
                 name,
                 MsgSkillRequest {
@@ -154,6 +155,9 @@ impl MyDataOut {
             )
             .await
             .unwrap();
+
+        sender.send(RequestResponse{ code: 200}).unwrap();
+        println!("Skill answer: {:?}", answer);
     }
 }
 
@@ -173,6 +177,7 @@ async fn main() {
         // Wait for client to be fully ready
         tokio::time::sleep(Duration::from_secs(1)).await;
         loop {
+            tokio::time::sleep(Duration::from_secs(6)).await;
             request_timer.tick().await;
             println!("Sending request to: {}", name);
             m_out.send_request(name.clone()).await;

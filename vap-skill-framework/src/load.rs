@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fs::DirEntry};
 use std::fs;
 use std::path::Path;
 
@@ -22,7 +22,9 @@ where
         .read_dir()
         .unwrap()
         .into_iter()
-        .filter_map(|r| r.unwrap().file_name().to_str().unwrap().parse().ok())
+        .filter_map(|r| {
+            get_lang_id(&r.unwrap())
+        })
         .collect()
 }
 
@@ -31,6 +33,7 @@ where
     P: AsRef<Path>,
 {
     let folder = intents.as_ref();
+
     folder
         .read_dir()
         .unwrap()
@@ -39,7 +42,7 @@ where
             let r = r.unwrap();
             let t = r.file_type().unwrap();
             if t.is_file() {
-                let i: LanguageIdentifier = r.file_name().to_str().unwrap().parse().unwrap();
+                let i: LanguageIdentifier = get_lang_id(&r).unwrap();
 
                 if langs.contains(&&i) {
                     let l: LangData = from_str(&fs::read_to_string(r.path()).unwrap()).unwrap();
@@ -54,6 +57,15 @@ where
         .collect()
 }
 
+fn get_lang_id (entry: &DirEntry) -> Option<LanguageIdentifier> {
+    Path::new(&entry.path())
+    .file_stem()
+    .unwrap()
+    .to_str()
+    .unwrap()
+    .parse()
+    .ok()
+}
 type ScopeData = HashMap<String, IntentData>;
 
 #[derive(Debug, Deserialize)]
@@ -61,6 +73,7 @@ struct LangData {
     #[serde(rename = "intents")]
     scopes: HashMap<String, ScopeData>,
 
+    #[serde(default)]
     entities: HashMap<String, EntityData>,
 }
 
@@ -88,7 +101,9 @@ impl LangData {
 #[derive(Clone, Debug, Deserialize)]
 struct IntentData {
     utterances: Vec<String>,
-    slots: HashMap<String, String>,
+
+    #[serde(default)]
+    slots: Option<HashMap<String, String>>,
 }
 
 impl IntentData {
@@ -101,6 +116,7 @@ impl IntentData {
 
         let slots = self
             .slots
+            .unwrap_or_else(HashMap::new)
             .into_iter()
             .map(|(n, e)| NluDataSlot { name: n, entity: e })
             .collect();
