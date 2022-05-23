@@ -719,6 +719,7 @@ dependencies = [
  "fluent",
  "fluent-langneg",
  "futures",
+ "log",
  "rmp",
  "rmp-serde",
  "serde",
