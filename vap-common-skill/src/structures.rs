@@ -1,4 +1,8 @@
-use std::{collections::HashMap, fmt::Display, hash::Hash};
+use std::{
+    collections::HashMap,
+    fmt::{Display, Write},
+    hash::Hash,
+};
 
 use serde::{Deserialize, Serialize};
 use unic_langid::LanguageIdentifier;
@@ -361,18 +365,41 @@ impl Eq for Value {}
 
 impl Display for Value {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fn vec_to_string<D: Display>(v: &[D]) -> String {
-            v.iter()
-                .map(|v| v.to_string())
-                .collect::<Vec<String>>()
-                .join(", ")
+        fn write_vec<D: Display>(
+            v: &[D],
+            fmt: &mut std::fmt::Formatter,
+        ) -> Result<(), std::fmt::Error> {
+            fmt.write_char('[')?;
+            let mut it = v.iter().peekable();
+            while let Some(val) = it.next() {
+                if it.peek().is_some() {
+                    fmt.write_fmt(format_args!("{}, ", &val.to_string()))?;
+                } else {
+                    fmt.write_str(&val.to_string())?;
+                }
+            }
+
+            fmt.write_char(']')?;
+
+            Ok(())
         }
 
-        fn map_to_string<D1: Display, D2: Display>(m: &HashMap<D1, D2>) -> String {
-            m.iter()
-                .map(|(k, v)| format!("{}: {}", k, v))
-                .collect::<Vec<String>>()
-                .join(", ")
+        fn write_map<D1: Display, D2: Display>(
+            m: &HashMap<D1, D2>,
+            fmt: &mut std::fmt::Formatter,
+        ) -> Result<(), std::fmt::Error> {
+            fmt.write_char('{')?;
+            let mut it = m.iter().peekable();
+            while let Some((k, v)) = it.next() {
+                if it.peek().is_some() {
+                    fmt.write_fmt(format_args!("{}: {}, ", k, v))?;
+                } else {
+                    fmt.write_fmt(format_args!("{}: {}", k, v))?;
+                }
+            }
+            fmt.write_char('}')?;
+
+            Ok(())
         }
 
         match self {
@@ -389,9 +416,9 @@ impl Display for Value {
             Value::F32(f) => fmt.write_str(&f.to_string()),
             Value::F64(f) => fmt.write_str(&f.to_string()),
             Value::String(str) => fmt.write_str(str),
-            Value::Binary(b) => fmt.write_str(&vec_to_string(b)),
-            Value::Array(a) => fmt.write_str(&vec_to_string(a)),
-            Value::Map(m) => fmt.write_str(&map_to_string(m)),
+            Value::Binary(b) => write_vec(b, fmt),
+            Value::Array(a) => write_vec(a, fmt),
+            Value::Map(m) => write_map(m, fmt),
         }
     }
 }
