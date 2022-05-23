@@ -1,0 +1,214 @@
+{
+    // Use IntelliSense para saber los atributos posibles.
+    // Mantenga el puntero para ver las descripciones de los existentes atributos.
+    // Para más información, visite: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'vap-common'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=vap-common"
+                ],
+                "filter": {
+                    "name": "vap-common",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'vap-client-register'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=vap-client-register"
+                ],
+                "filter": {
+                    "name": "vap-client-register",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'demo'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=demo",
+                    "--package=vap-client-register"
+                ],
+                "filter": {
+                    "name": "demo",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'demo'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=demo",
+                    "--package=vap-client-register"
+                ],
+                "filter": {
+                    "name": "demo",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'vap-skill-register'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=vap-skill-register"
+                ],
+                "filter": {
+                    "name": "vap-skill-register",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'demo' skill-reg",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=demo",
+                    "--package=vap-skill-register"
+                ],
+                "filter": {
+                    "name": "demo",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'demo'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=demo",
+                    "--package=vap-skill-register"
+                ],
+                "filter": {
+                    "name": "demo",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'vap-common-skill'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=vap-common-skill"
+                ],
+                "filter": {
+                    "name": "vap-common-skill",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'vap-skill-framework'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=vap-skill-framework"
+                ],
+                "filter": {
+                    "name": "vap-skill-framework",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'demo'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=demo",
+                    "--package=vap-skill-framework"
+                ],
+                "filter": {
+                    "name": "demo",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'demo'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=demo",
+                    "--package=vap-skill-framework"
+                ],
+                "filter": {
+                    "name": "demo",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
