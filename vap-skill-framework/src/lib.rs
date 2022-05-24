@@ -14,6 +14,7 @@ use vap_common_skill::structures::{msg_notification::Data, msg_query::QueryData,
 
 pub use vap_common_skill::structures::{msg_skill_request::RequestDataKind, PlainCapability};
 
+/// The skill itself, use this to communicate with the registry.
 pub struct Skill {
     client: CoAPClient,
     id: String,
@@ -27,6 +28,17 @@ impl Skill {
         format!("127.0.0.1:{}", PORT)
     }
 
+    /// Creates a new skill, will also connect to the skill registry and register
+    /// itself so that it receives requests. Returns both itself and a channel
+    /// that you will use to receive events. This follows RAII and as as soon as
+    /// it is dropped will disconnect from the skill registry.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - A human-readable name for this skill
+    /// * `id` -  This skill id like 'com.my_company.my_skill'
+    /// * `intents` - Where are the skills stored
+    /// 
     pub fn new<S1, S2, P>(name: S1, id: S2, intents: P) -> Result<(Self, SkillIn)>
     where
         S1: Into<String>,
@@ -134,7 +146,7 @@ impl Skill {
         }
     }
 
-    pub fn close(&mut self) -> Result<()> {
+    fn close(&mut self) -> Result<()> {
         if self.send_message_no_payload(
             Method::Delete,
             &format!("vap/skillRegistry/skills/{}", &self.id),
@@ -146,6 +158,7 @@ impl Skill {
         }
     }
 
+    /// Send a standalone notification to some ID (a client or the system itself)
     pub fn notify(
         &mut self,
         client_id: String,
@@ -157,6 +170,7 @@ impl Skill {
         }])
     }
 
+    /// Send notifications (of any type) to several clients
     pub fn notify_multiple(&mut self, data: Vec<Data>) -> Result<MsgNotificationResponse> {
         println!("Send answer");
         match self.send_message(
@@ -173,6 +187,7 @@ impl Skill {
         }
     }
 
+    /// Send queries to any number of IDs (clients or the system itself).
     pub fn query(&mut self, data: Vec<QueryData>) -> Result<MsgQueryResponse> {
         match self.send_message(
             Method::Get,
@@ -190,7 +205,7 @@ impl Skill {
         }
     }
 
-    pub fn register(&mut self) -> Result<()> {
+    fn register(&mut self) -> Result<()> {
         let mut sender = self.sender.clone();
         self.client
             .observe(
@@ -217,6 +232,7 @@ impl Skill {
             Ok(())
     }
 
+    /// Answer an incoming request
     pub fn answer(
         &mut self,
         req: &MsgSkillRequest,
