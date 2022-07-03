@@ -116,7 +116,7 @@ impl IntentData {
 
         let slots = self
             .slots
-            .unwrap_or_else(HashMap::new)
+            .unwrap_or_default()
             .into_iter()
             .map(|(n, e)| NluDataSlot { name: n, entity: e })
             .collect();

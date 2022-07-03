@@ -10,7 +10,7 @@ use log::warn;
 use serde::Serialize;
 use thiserror::Error;
 use unic_langid::LanguageIdentifier;
-use vap_common_skill::structures::{msg_notification::Data, msg_query::QueryData, *};
+use vap_common_skill::structures::{msg_notification::Data, msg_query::QueryData, *, msg_skill_request::RequestSlot};
 
 pub use vap_common_skill::structures::{msg_skill_request::RequestDataKind, PlainCapability};
 
@@ -19,7 +19,7 @@ pub struct Skill {
     client: CoAPClient,
     id: String,
     langs: Vec<LanguageIdentifier>,
-    sender: mpsc::Sender<MsgSkillRequest>,
+    sender: mpsc::Sender<SkillRequest>,
 }
 
 impl Skill {
@@ -220,7 +220,7 @@ impl Skill {
 
                         match rmp_serde::from_read::<_, MsgSkillRequest>(Cursor::new(m.payload)) {
                             Ok(payload) => {
-                                sender.try_send(payload).unwrap();
+                                sender.try_send(payload.into()).unwrap();
                             }
                             Err(e) => {
                                 warn!("Received a bad msgpack message, will be ignored: {}", e);
@@ -235,7 +235,7 @@ impl Skill {
     /// Answer an incoming request
     pub fn answer(
         &mut self,
-        req: &MsgSkillRequest,
+        req: &SkillRequest,
         capabilities: Vec<PlainCapability>,
     ) -> Result<()> {
         self.notify_multiple(vec![Data::Requested {
@@ -266,7 +266,64 @@ fn extract_type(code: MessageClass) -> ResponseType {
     }
 }
 
-type SkillIn = mpsc::Receiver<MsgSkillRequest>;
+#[derive(Clone, Debug)]
+pub struct SkillRequest {
+    pub request_id: u64,
+    pub client: msg_skill_request::ClientData,
+    pub request: Request
+}
+
+#[derive(Clone, Debug)]
+pub enum Request {
+    Intent(String, RequestData),
+    Event(String, RequestData),
+    CanAnswer(String, RequestData)
+}
+
+#[derive(Clone, Debug)]
+pub enum RequestStr<'a> {
+    Intent(&'a str, &'a RequestData),
+    Event(&'a str, &'a RequestData),
+    CanAnswer(&'a str, &'a RequestData)
+}
+
+impl Request {
+    pub fn as_str(& self) -> RequestStr<'_>  {
+        match &self {
+            Request::Intent(s, d) => RequestStr::Intent(s.as_str(), d),
+            Request::Event(s, d) => RequestStr::Event(s.as_str(), d),
+            Request::CanAnswer(s, d) => RequestStr::CanAnswer(s.as_str(), d)
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct RequestData {
+    pub locale: String,
+    pub slots: Vec<RequestSlot>
+}
+
+impl From<MsgSkillRequest> for SkillRequest {
+    fn from(msg: MsgSkillRequest) -> Self {
+        let req_data = RequestData {
+            locale: msg.request.locale,
+            slots: msg.request.slots
+        };
+
+        let request = match msg.request.type_ {
+            RequestDataKind::CanAnswer => Request::CanAnswer(msg.request.intent, req_data),
+            RequestDataKind::Event => Request::Event(msg.request.intent, req_data),
+            RequestDataKind::Intent => Request::Intent(msg.request.intent, req_data)
+        };
+
+        Self { 
+            request_id: msg.request_id,
+            client: msg.client,
+            request}
+    }
+} 
+
+type SkillIn = mpsc::Receiver<SkillRequest>;
 
 type Result<T> = core::result::Result<T, Error>;
 
@@ -289,7 +346,7 @@ mod tests {
 
     #[tokio::test]
     async fn it_works() {
-        let (mut skill, mut skill_in) = Skill::new("Test", "com.example.test", "assets").unwrap();
+        let (skill, mut skill_in) = Skill::new("Test", "com.example.test", "assets").unwrap();
         loop {
             let req = skill_in.next().await.unwrap();
         }
