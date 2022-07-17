@@ -64,7 +64,11 @@ pub async fn on_post(
         "vap/skillRegistry/connect" => {
             match read_payload(&request.message.payload, request.response) {
                 Ok::<(MsgConnect,_),_>((p, resp)) => {
-                    if !current_skills.lock().unwrap().contains_key(&p.id) && p.vap_version == VAP_VERSION {
+                    // Until there's a way for skill "connections" to be checked we'll
+                    // disable checking whether an skill already exists
+                    //let is_in_dict = current_skills.lock().unwrap().contains_key(&p.id);
+                    let is_in_dict = false;
+                    if !is_in_dict && p.vap_version == VAP_VERSION {
                         let (sender, receiver) = oneshot::channel();
                         let skill_id = p.id.clone();
                         in_send.send((SkillRegisterMessage::Connect(p), sender)).await.unwrap();
@@ -86,6 +90,12 @@ pub async fn on_post(
                         }).await
                     }
                     else {
+                        if p.vap_version != VAP_VERSION {
+                            println!("Received a non-compatible version, bad request");
+                        }
+                        else if is_in_dict {
+                            println!("Tried to register a skill already connected, if this a genuine request wait a little");
+                        }
                         respond(resp, ResponseType::BadRequest, vec![])
                     }
                 }

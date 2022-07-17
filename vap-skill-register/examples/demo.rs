@@ -31,7 +31,6 @@ impl MyData {
                     println!("{} wants to connect", m.id);
                     self.name.take().map(|c| c.send(m.id).unwrap());
                     let data = rmp_serde::to_vec(&MsgConnectResponse {
-                        unique_authentication_token: None,
                         langs: vec![Language {
                             language: "en".to_string(),
                             country: Some("US".to_string()),
@@ -177,10 +176,11 @@ async fn main() {
         // Wait for client to be fully ready
         tokio::time::sleep(Duration::from_secs(1)).await;
         loop {
-            tokio::time::sleep(Duration::from_secs(6)).await;
+            tokio::time::sleep(Duration::from_secs(15)).await;
             request_timer.tick().await;
             println!("Sending request to: {}", name);
             m_out.send_request(name.clone()).await;
+            tokio::time::sleep(Duration::from_secs(99)).await;
         }
     };
 

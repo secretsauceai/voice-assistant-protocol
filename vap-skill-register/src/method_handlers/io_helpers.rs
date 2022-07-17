@@ -36,7 +36,7 @@ pub fn read_payload<T: DeserializeOwned>(payload: &[u8], r: Option<CoapResponse>
         }
         Err(e) => {
             Err(r.map(|mut r|{
-                println!("{}", &e);
+                println!("Found an error while reading payload: {}", &e);
                 let status = match e {
                     rmp_serde::decode::Error::TypeMismatch(_) => {
                         coap_lite::ResponseType::RequestEntityIncomplete
@@ -71,6 +71,7 @@ pub async fn handle_msg<T: DeserializeOwned, F, F2>(
                 wait_response(receiver, resp, |_|{}).await
             }
             else {
+                println!("Bad request because key_check");
                 respond(resp, ResponseType::BadRequest, vec![])
             }
         }
