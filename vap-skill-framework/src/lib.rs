@@ -1,6 +1,6 @@
 mod load;
 
-use std::{io::Cursor, path::Path};
+use std::{io::Cursor, path::Path, time::Duration};
 
 use coap::CoAPClient;
 use coap_lite::{MessageClass, RequestType as Method, ResponseType};
@@ -52,38 +52,48 @@ impl Skill {
             vap_version: "Alpha".into(),
         })
         .expect("Failed to make initial payload, report this");
-
         let mut client = CoAPClient::new(Self::get_address())?;
-        let resp = client.request_path(
-            "vap/skillRegistry/connect",
-            Method::Post,
-            Some(payload),
-            None,
-        )?;
 
-        match resp.message.header.code {
-            MessageClass::Response(ResponseType::Created) => {
-                let payload: MsgConnectResponse =
-                    rmp_serde::from_read(Cursor::new(resp.message.payload)).unwrap();
-                let (sender, receiver) = mpsc::channel(10);
+        let mut remaining_retries = 3;
+        while remaining_retries > 0 {
+            
+            let resp = client.request_path(
+                "vap/skillRegistry/connect",
+                Method::Post,
+                Some(payload.clone()),
+                None,
+            )?;
 
-                let mut skill = Self {
-                    client,
-                    id: id_str,
-                    langs: payload.langs.into_iter().map(|l| l.into()).collect(),
-                    sender,
-                };
+            match resp.message.header.code {
+                MessageClass::Response(ResponseType::Created) => {
+                    let payload: MsgConnectResponse =
+                        rmp_serde::from_read(Cursor::new(resp.message.payload)).unwrap();
+                    let (sender, receiver) = mpsc::channel(10);
 
-                skill.register_intents(intents)?;
-                skill.register()?;
+                    let mut skill = Self {
+                        client,
+                        id: id_str,
+                        langs: payload.langs.into_iter().map(|l| l.into()).collect(),
+                        sender,
+                    };
 
-                Ok((skill, receiver))
+                    skill.register_intents(intents)?;
+                    skill.register()?;
+
+                    return Ok((skill, receiver))
+                }
+                MessageClass::Response(ResponseType::BadRequest) => {
+                    remaining_retries -=1;
+                    println!("There's seemingly some problem, waiting and retrying");
+                }
+                _ => {
+                    println!("{}", resp.message.header.code);
+                    panic!("ERROR, got unexpected message!!")
+                }
             }
-            _ => {
-                println!("{}", resp.message.header.code);
-                panic!("ERROR")
-            }
+            std::thread::sleep(Duration::from_secs(1));
         }
+        panic!("Connection failed!");
     }
 
     fn send_message<T: Serialize>(

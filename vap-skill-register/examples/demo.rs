@@ -29,7 +29,7 @@ impl MyData {
             let resp = match msg {
                 SkillRegisterMessage::Connect(m) => {
                     println!("{} wants to connect", m.id);
-                    self.name.take().map(|c| c.send(m.id).unwrap());
+                    if let Some(c) = self.name.take() { c.send(m.id).unwrap() }
                     let data = rmp_serde::to_vec(&MsgConnectResponse {
                         langs: vec![Language {
                             language: "en".to_string(),
@@ -180,7 +180,6 @@ async fn main() {
             request_timer.tick().await;
             println!("Sending request to: {}", name);
             m_out.send_request(name.clone()).await;
-            tokio::time::sleep(Duration::from_secs(99)).await;
         }
     };
 
