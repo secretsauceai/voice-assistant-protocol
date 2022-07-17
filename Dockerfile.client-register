@@ -27,7 +27,7 @@ COPY ./vap-common-client/Cargo.toml ./vap-common-client/Cargo.toml
 COPY ./vap-common-skill/Cargo.toml ./vap-common-skill/Cargo.toml
 COPY ./vap-skill-register/Cargo.toml ./vap-skill-register/Cargo.toml
 COPY ./vap-skill-register-demo/Cargo.toml ./vap-skill-register-demo/Cargo.toml
-COPY ./Cargo.toml ./Cargo.toml
+COPY ./Cargo.toml ./Cargo.lock ./
 
 # Build the dependencies
 RUN cargo build --release --package=vap-client-register-demo
