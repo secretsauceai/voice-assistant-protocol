@@ -103,7 +103,7 @@ impl SkillRegister {
             // returns an error.
             Runtime::new().unwrap().block_on(async move {
                 let ip_address = format!("127.0.0.1:{}", port);
-                let client = CoAPClient::new(&ip_address).unwrap();
+                let mut client = CoAPClient::new(&ip_address).unwrap();
                 barrier2.wait(); // Make sure we are not sending anything before the server is ready
 
                 loop {

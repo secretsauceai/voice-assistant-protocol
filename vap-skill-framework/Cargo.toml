@@ -11,10 +11,10 @@ fluent = "^0.16"
 fluent-langneg = "^0.13" # Language negotiation
 futures = "^0.3"
 coap = {git = "https://github.com/Covertness/coap-rs"}
-coap-lite = "^0.8"
+coap-lite = "^0.9"
 log = "^0.4"
 rmp = "^0.8"
-rmp-serde = "^0.15"
+rmp-serde = "^1.1"
 thiserror = "^1.0"
 toml = "^0.5"
 serde = "^1.0"
