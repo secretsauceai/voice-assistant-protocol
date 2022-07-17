@@ -50,7 +50,6 @@ impl Skill {
             id: id_str.clone(),
             name: name.into(),
             vap_version: "Alpha".into(),
-            unique_authentication_token: Some("".into()),
         })
         .expect("Failed to make initial payload, report this");
 
@@ -81,6 +80,7 @@ impl Skill {
                 Ok((skill, receiver))
             }
             _ => {
+                println!("{}", resp.message.header.code);
                 panic!("ERROR")
             }
         }

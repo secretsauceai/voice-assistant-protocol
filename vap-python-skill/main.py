@@ -46,8 +46,7 @@ class VapClient():
         payload = {
             "name": "My test skill",
             "id": skill_id,
-            "vapVersion": "Alpha",
-            "uniqueAuthenticationToken": "",
+            "vapVersion": "Alpha"
         }
 
         # Create message

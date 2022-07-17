@@ -12,23 +12,14 @@ Name of the Zeroconf service for the Client Registry "vap-client-registry.udp"
 * name:
 * id: String -> (like org.company.product)
 * vapVersion:
-* uniqueAuthenticationToken: 
-
-Client connects with client register. We have a uniqueAuthenticationToken, this let us know and understand that the client has been allowed in the system, and that it is who's saying to be. This is required mostly because of the possibility of user authenticaion, if any client was allowed to access the server, aunthencation would be useless, someone not allowed in the assistant could just attack the system with a hacked client.
-
-The uniqueAuthenticationToken works just like the skills one, the first time a client connects, that field is empty here and the server will asign one, which the client needs to send the next time they connect to the system. Failing this means that the client won't be allowed into the system.
 
 **Answer**
 * One of:
     * OK! (Code: 201 Created)
-        * UniqueAuthenticationToken: (Optional)
         * locales: Locale
     * Errors:
         * 400 Bad Request: Id already exists? (should Ids be unique?)
         * 400 Bad Request: vapVersion incompatible
-        * 401 Unauthorized: uniqueAuthenticationToken wrong
-            * code = 401
-            * type = "uniqueAuthenticationTokenErronous"
         * 401 Unauthorized: connection denied by policy or by the user (maybe the user didn't accept the client or it is blocked)
             * code = 401
             * type = "connectionDenied"

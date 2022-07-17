@@ -13,7 +13,6 @@ Name of the CoAP service for the Skill Registry "vap-skill-registry"
 * name: Human readable name of the skill
 * id: Unique ascii based name of the skill in the form of org.company.product
 * vapVersion:
-* uniqueAuthenticationToken (Optional)
 
 Skill connects with skill register.
 
@@ -25,30 +24,9 @@ Skill connects with skill register.
     * Error:
         * 400 Bad Request: Id already exists? (should Ids be unique?)
         * 400 Bad Request: vapVersion incompatible
-        * 401 Unauthorized: uniqueAuthenticationToken wrong
-            * code = 401
-            * type = "uniqueAuthenticationTokenErronous"
         * 401 Unauthorized: connection denied by policy or by the user (maybe the user didn't accept the client or it is blocked)
             * code = 401
             * type = "connectionDenied"
-
-
-The authentication tokens serve so that both the skill registry and the skill know
-that no identity theft is ocurring.
-
-First, the UniqueAuthenticationToken. This makes sures that no skill tries to 
-act as another one already registered (running now or not). This serves as
-two purposes: first, if the server holds any information about the skill this
-makes it difficult for a skill to access that information about another skill (
-whether it's data, config, or just the cache of the compiled NLU model) and two,
-this let us limit some capabilities to some skills, capabilities like accessing
-the whole config or modifying parts of the system. When a skill first connects
-to a system it will send the init message with no UniqueAuthenticationToken, then,
-the server, when it receives the message if it is the first time that it sees
-that id then it will generate a token which will be sent to the skill, that same
-token has to be resent each time the skill wants to connect to a system.
-
-*NOTE*: This means that a skill needs permanent storage
 
 After that send:
 *POST* **Server/vap/skillRegistry/registerIntents** (Confirmable: Mandatory, Skill -> Registry)

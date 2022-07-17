@@ -16,19 +16,13 @@ pub struct MsgConnect {
     pub name: String,
 
     #[serde(rename = "vapVersion")]
-    pub vap_version: String,
-
-    #[serde(rename = "uniqueAuthenticationToken")]
-    pub unique_authentication_token: Option<String>,
+    pub vap_version: String
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MsgConnectResponse {
     /// A list of languages currently in use by the voice assistant
-    pub langs: Vec<Language>,
-
-    #[serde(rename = "uniqueAuthenticationToken")]
-    pub unique_authentication_token: Option<String>,
+    pub langs: Vec<Language>
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
