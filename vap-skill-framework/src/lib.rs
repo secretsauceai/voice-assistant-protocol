@@ -54,7 +54,7 @@ impl Skill {
         })
         .expect("Failed to make initial payload, report this");
 
-        let client = CoAPClient::new(Self::get_address())?;
+        let mut client = CoAPClient::new(Self::get_address())?;
         let resp = client.request_path(
             "vap/skillRegistry/connect",
             Method::Post,
@@ -87,7 +87,7 @@ impl Skill {
     }
 
     fn send_message<T: Serialize>(
-        &self,
+        &mut self,
         method: Method,
         path: &str,
         data: T,
@@ -106,7 +106,7 @@ impl Skill {
         ))
     }
 
-    fn send_message_no_payload(&self, method: Method, path: &str) -> ResponseType {
+    fn send_message_no_payload(&mut self, method: Method, path: &str) -> ResponseType {
         extract_type(
             self.client
                 .request_path(path, method, None, None)
