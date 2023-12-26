@@ -1,48 +1,42 @@
+#![no_std]
+#![allow(dead_code)]
+extern crate alloc;
+use alloc::{format, string::String, vec::Vec};
 use coap_lite::{CoapRequest, CoapResponse, MessageClass, MessageType, Packet, RequestType};
-use no_std_net::SocketAddr;
+
+use core;
+use embedded_nal::{TcpClientStack, UdpClientStack};
+use no_std_net::ToSocketAddrs;
+use vap_common::capability::CapabilityCode;
+
 pub struct VAPClient<Endpoint> {
     endpoint: Endpoint,
     name: String,
     id: String,
     vap_version: String,
 }
+/// Structure of Request:
+/// *POST* **Server/vap/clientRegistry/connect** (Confirmable: Mandatory, Client -> Registry)
+///* name:
+///* id: String -> (like org.company.product)
+///* vapVersion:
+///The server will answer a UniqueAuthenticationToken
+/// only if this is the first time the client is
+/// connecting and we don't have any record of it.
+struct ConnectRequest<Endpoint>(CoapRequest<Endpoint>);
 
-impl<Endpoint> VAPClient<Endpoint> {
+impl<Endpoint> ConnectRequest<Endpoint> {
     pub fn new(endpoint: Endpoint, name: String, id: String, vap_version: String) -> Self {
-        Self {
-            endpoint,
-            name,
-            id,
-            vap_version,
-        }
+        let mut packet = Packet::new();
+        packet.header.set_type(MessageType::Confirmable);
+        packet.header.code = MessageClass::Request(RequestType::Post);
+
+        packet.payload = format!("Capabilities:").into();
+        let mut req = CoapRequest::from_packet(packet, endpoint);
+        req.set_path("Server/vap/clientRegistry/connect");
+        Self(req)
     }
-    pub fn connect(&self, socket: SocketAddr) -> Result<Locale, Error> {
-     
-    let mut packet = Packet::new();
-    packet.header.set_type(MessageType::Confirmable);
-    packet.header.code = MessageClass::Request(RequestType::Post);
-
-    packet.payload = format!("name={},id={},vapVersion={}", self.name, self.id, self.vap_version).into();
-    let mut req = CoapRequest::from_packet(packet, self.endpoint);
-    
-    req.set_path("Server/vap/clientRegistry/connect");
-    
-    socket.send_to(req.message.to_bytes(), self.endpoint).unwrap();
-
-    
-    let mut res = 
-    println!("Response: {:?}", res);
-    let payload = res.get_payload().unwrap();
-    println!("Payload: {:?}", payload);
-    }
-
 }
-
-// *POST* **Server/vap/clientRegistry/connect** (Confirmable: Mandatory, Client -> Registry)
-// * name:
-// * id: String -> (like org.company.product)
-// * vapVersion:
-
 // **Answer**
 // * One of:
 //     * OK! (Code: 201 Created)
@@ -54,22 +48,76 @@ impl<Endpoint> VAPClient<Endpoint> {
 //             * code = 401
 //             * type = "connectionDenied"
 
-// The server will answer a UniqueAuthenticationToken only if this is the first time the client is connecting and we don't have any record of it.
-pub fn connect(endpoint: Endpoint, name: String, id: String, vap_version: String) -> Result<Locale, Error> {
-    let mut packet = Packet::new();
-    packet.header.set_type(MessageType::Confirmable);
-    packet.header.code = MessageClass::Request(RequestType::Post);
+///Structure of Request:
+/// *POST* **Server/vap/clientRegistry/sessionStart** (Confirmable: Optional, Client -> Registry)
+///* capabilities: Optional<[]> ->
+///    * name: String
+///    * <capability data>
+///* exactTimeStamp:?
+///This signals that a client wants to start a session. At this point we can send capabilities
+/// too, they are meant for user authorization and wake word double checking (with a bigger,
+/// slower, more accurate model in the server). Of course, the server is free to either accept
+/// it or reject if because of any reason.
+struct SessionStartRequest<Endpoint>(CoapRequest<Endpoint>);
 
-    packet.payload = format!("name={},id={},vapVersion={}", name, id, vap_version).into();
-    let mut req = CoapRequest::from_packet(packet, None)
-    from_packet(packet, )
-    req.set_method(RequestType::Post);
-    req.set_path("Server/vap/clientRegistry/connect");
-
-    req.set_payload("vapVersion".as_bytes().to_vec());
-    let mut res = req.send("coap://localhost:5683").unwrap();
-    println!("Response: {:?}", res);
-    let payload = res.get_payload().unwrap();
-    println!("Payload: {:?}", payload);
-    Ok(Locale {})
+impl<Endpoint> SessionStartRequest<Endpoint> {
+    pub fn new(endpoint: Endpoint, capabilities: Option<&[CapabilityCode]>) -> Self {
+        let mut packet = Packet::new();
+        packet.header.set_type(MessageType::Confirmable);
+        packet.header.code = MessageClass::Request(RequestType::Post);
+        if let Some(capabilities) = capabilities {
+            packet.payload = Vec::from_iter(capabilities.iter().map(|c| c.to_u8())).into();
+        }
+        let mut req = CoapRequest::from_packet(packet, endpoint);
+        req.set_path("Server/vap/clientRegistry/sessionStart");
+        Self(req)
+    }
 }
+
+/// Structure of Request:
+/// *POST* **Server/vap/clientRegistry/sessionData** (Confirmable: Optional, Client -> Registry)
+/// * capabilities: [] ->
+///     * name: String
+///     * <capability data>
+/// * lastFragment: bool
+
+struct SessionDataRequest<Endpoint>(CoapRequest<Endpoint>);
+//TODO: make this generic over the type of data, conversion to
+// Vec<u8> should be handled within the constuction of the request
+//if possible
+impl<Endpoint> SessionDataRequest<Endpoint> {
+    pub fn new(endpoint: Endpoint, data: Vec<u8>, end_session: bool) -> Self {
+        let mut packet = Packet::new();
+        packet.header.set_type(MessageType::Confirmable);
+        packet.header.code = MessageClass::Request(RequestType::Post);
+        packet.payload = data.into();
+        let mut req = CoapRequest::from_packet(packet, endpoint);
+        req.set_path("Server/vap/clientRegistry/sessionData");
+        Self(req)
+    }
+}
+struct clientCloseRequest<Endpoint>(CoapRequest<Endpoint>);
+
+impl<Endpoint> clientCloseRequest<Endpoint> {
+    pub fn new(endpoint: Endpoint, id: String) -> Self {
+        let mut packet = Packet::new();
+        packet.header.set_type(MessageType::Confirmable);
+        packet.header.code = MessageClass::Request(RequestType::Post);
+        packet.payload = id.into();
+        let mut req = CoapRequest::from_packet(packet, endpoint);
+        req.set_path("Server/vap/clientRegistry/clientClose");
+        Self(req)
+    }
+}
+
+// enum ConnectResponseClass {
+//     Ok,
+//     Error(ConnectError),
+// }
+
+// *POST* **Server/vap/clientRegistry/connect** (Confirmable: Mandatory, Client -> Registry)
+// * name:
+// * id: String -> (like org.company.product)
+// * vapVersion:
+
+// The server will answer a UniqueAuthenticationToken only if this is the first time the client is connecting and we don't have any record of it.

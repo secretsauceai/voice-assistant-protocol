@@ -1,7 +1,7 @@
 [package]
 name = "vap-client-register"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -9,3 +9,5 @@ edition = "2018"
 #toad_msg = { version = "0.0.1", default-features = false }
 coap-lite = { version = "0.11.3", default-features = false }
 no-std-net = "0.6.0"
+embedded-nal = "0.8.0"
+vap-common = { path = "../vap-common" }
