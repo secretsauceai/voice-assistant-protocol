@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+pub mod capability;
 
 #[cfg(test)]
 mod tests {
