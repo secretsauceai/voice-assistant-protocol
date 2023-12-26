@@ -47,7 +47,7 @@ version = "0.12.0"
 source = "git+https://github.com/Covertness/coap-rs#afa7d108f8cd6b219ceaf1f0fced36b6e8551ddf"
 dependencies = [
  "bytes",
- "coap-lite",
+ "coap-lite 0.9.1",
  "futures",
  "log",
  "lru_time_cache",
@@ -70,6 +70,12 @@ checksum = "3b4859ead43cef7e14593c5238cb3dd8800f41ade206bdf08c44c51f2d943fd3"
 dependencies = [
  "lru_time_cache",
 ]
+
+[[package]]
+name = "coap-lite"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25ca11cbc756cf12eb24824285dbe36d97e4cfea404aaa1240477f3ae091f779"
 
 [[package]]
 name = "fluent"
@@ -319,6 +325,12 @@ checksum = "b9f1c5b025cda876f66ef43a113f91ebc9f4ccef34843000e0adf6ebbab84e21"
 dependencies = [
  "winapi",
 ]
+
+[[package]]
+name = "no-std-net"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43794a0ace135be66a25d3ae77d41b91615fb68ae937f904090203e81f755b65"
 
 [[package]]
 name = "ntapi"
@@ -728,6 +740,10 @@ dependencies = [
 [[package]]
 name = "vap-client-register"
 version = "0.1.0"
+dependencies = [
+ "coap-lite 0.11.3",
+ "no-std-net",
+]
 
 [[package]]
 name = "vap-common"
@@ -747,7 +763,7 @@ name = "vap-skill-framework"
 version = "0.1.0"
 dependencies = [
  "coap",
- "coap-lite",
+ "coap-lite 0.9.1",
  "fluent",
  "fluent-langneg",
  "futures",
@@ -767,7 +783,7 @@ name = "vap-skill-register"
 version = "0.1.0"
 dependencies = [
  "coap",
- "coap-lite",
+ "coap-lite 0.9.1",
  "futures",
  "rmp",
  "rmp-serde",

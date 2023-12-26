@@ -10,6 +10,7 @@ Here you will find:
 
 * **Implementations:** Inside `vap-client-register`, `vap-common`, `vap-common-client`, `vap-common-skill`, `vap-skill-register`, `vap-skill-framework` and `vap-python-skill` folders are the reference implementations. The skill client code is in Python as well as Rust, for better accessibility while everything else is in Rust for running it even on devices with limited capabilities. Note: The skill client code in Python is meant as a simple example implementing directly VAP, do note that the implementation there does not cover every single error handling of the protocol.
 
+* **API**: Inside the `api` folder are OpenAPI specifications for the client and skill registry.
 ## Implementations
 
 

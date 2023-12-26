@@ -6,3 +6,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+#toad_msg = { version = "0.0.1", default-features = false }
+coap-lite = { version = "0.11.3", default-features = false }
+no-std-net = "0.6.0"
